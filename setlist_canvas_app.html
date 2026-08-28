@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Setlist — anotações de palco</title>
+<style>
+:root{
+  --bg:#0b0d10; --panel:#14181e; --panel2:#1b212a; --line:#262e39;
+  --txt:#e9edf2; --dim:#8b96a5; --faint:#5b6675;
+  --amber:#f2b13c; --amber-ink:#1a1205; --red:#e8564a; --cyan:#4dd0e1;
+  --sheet:#0f1319;
+  --r:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--txt); overflow:hidden; overscroll-behavior:none;
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  display:flex; flex-direction:column;
+  -webkit-tap-highlight-color:transparent;
+}
+button,input,textarea,select{font:inherit;color:inherit;background:none;border:none;outline:none}
+button{cursor:pointer}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.hide{display:none!important}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.icon{width:1.15em;height:1.15em;flex:none;vertical-align:-.18em}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#39424f;border-radius:8px}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- topo ---------- */
+.topbar{display:flex;align-items:center;gap:16px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex:none}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.02em;color:var(--amber)}
+.brand span{color:var(--txt)}
+.tabs{display:flex;gap:2px;background:var(--panel2);border-radius:var(--r);padding:3px;margin-left:auto}
+.tabs button{padding:7px 14px;border-radius:7px;color:var(--dim);font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px}
+.tabs button.on{background:var(--amber);color:var(--amber-ink)}
+
+/* ---------- botões ---------- */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:var(--r);
+  background:var(--panel2);border:1px solid var(--line);color:var(--txt);font-size:14px;font-weight:600;
+  transition:background .12s,border-color .12s,color .12s}
+.btn:hover{border-color:#3d4857}
+.btn.primary{background:var(--amber);border-color:var(--amber);color:var(--amber-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.quiet{background:none;border-color:transparent;color:var(--dim);padding:8px 10px}
+.btn.quiet:hover{color:var(--txt);background:var(--panel2)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn.danger:hover{color:var(--red);border-color:#5c2a26}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ---------- containers ---------- */
+.view{position:absolute;inset:0;overflow-y:auto;padding:22px 18px 60px}
+.stage{flex:1;position:relative;overflow:hidden}
+.wrap{max-width:900px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.pad{padding:18px}
+h2.head{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--dim);font-size:13px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+
+.field{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:10px 13px}
+.field:focus{border-color:var(--amber)}
+select.field{width:auto;cursor:pointer;padding-right:10px}
+select.field option{background:var(--panel2);color:var(--txt)}
+textarea.field{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
+.search{position:relative}
+.search .icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--faint)}
+.search .field{padding-left:38px;border-radius:999px}
+
+.row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}
+.row:first-child{border-top:none}
+.row:hover{background:#171c23}
+.grow{flex:1;min-width:0}
+.tt{font-weight:650;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{color:var(--dim);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);margin-left:7px;vertical-align:middle}
+.chip{font-size:11.5px;padding:2px 7px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);color:var(--dim)}
+.acts{display:flex;gap:4px;flex:none}
+.empty{text-align:center;color:var(--faint);padding:44px 20px;font-size:14px}
+
+
+/* ---------- modo show ---------- */
+#v-show{display:flex;padding:0;overflow:hidden;--side:270px}
+.side{width:var(--side);flex:none;min-width:0;background:var(--panel);display:flex;flex-direction:column}
+.side header{padding:7px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:7px}
+.side header .grow{min-width:0}
+#show-name{font-size:13.5px;font-weight:700;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#show-info{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side .list{flex:1;overflow-y:auto;padding:6px;position:relative}
+.song{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;border:1px solid var(--line);
+  background:var(--panel2);margin-bottom:4px;user-select:none;cursor:pointer}
+.song.on{border-color:var(--amber);background:#241d0e}
+.song .num{color:var(--faint);font-size:11px;width:17px;text-align:right;flex:none}
+.song.on .num{color:var(--amber)}
+.song .tt{font-size:13px}
+.song .meta{font-size:11px}
+.grip{color:var(--faint);padding:3px 1px;cursor:grab;touch-action:none;flex:none}
+
+/* divisória arrastável */
+.split{flex:none;width:5px;background:var(--line);cursor:col-resize;touch-action:none;position:relative}
+.split::before{content:'';position:absolute;top:0;bottom:0;left:-6px;right:-6px}
+.split:hover,.split.on{background:var(--amber)}
+.grip:active{cursor:grabbing}
+.dragging{position:absolute;left:8px;right:8px;z-index:5;box-shadow:0 12px 24px rgba(0,0,0,.5)}
+.ghost{visibility:hidden}
+
+.desk{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.tools{display:flex;align-items:center;gap:4px;padding:5px 7px;border-bottom:1px solid var(--line);
+  background:var(--panel);flex:none;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.tools::-webkit-scrollbar{display:none}
+.tools .now .meta{font-size:10.5px}
+.tool{width:31px;height:31px;flex:none;display:grid;place-items:center;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
+.tool:hover{color:var(--txt)}
+.tool.on{background:var(--amber);border-color:var(--amber);color:var(--amber-ink)}
+.narrow{display:none}
+.swatch{width:21px;height:21px;flex:none;border-radius:50%;border:2px solid transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+.swatch.on{border-color:var(--txt)}
+.sep{width:1px;height:20px;flex:none;background:var(--line);margin:0 2px}
+.zoom{display:flex;align-items:center;flex:none;margin-left:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel2);overflow:hidden}
+.zoom button{padding:0 8px;height:29px;color:var(--dim)}
+.zoom button:hover{color:var(--txt)}
+.zoom span{font-size:11px;color:var(--dim);width:40px;text-align:center}
+
+.deskbody{flex:1;overflow:auto;padding:9px;position:relative;display:flex;
+  align-items:flex-start;justify-content:flex-start;scrollbar-gutter:stable}
+.deskbody.cx{justify-content:center}
+.deskbody.cy{align-items:center}
+.sheetbox{position:relative;background:var(--sheet);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 20px 50px rgba(0,0,0,.5);overflow:hidden;flex:none}
+/* a pauta é um SVG com o mesmo viewBox da folha: escala junto com o zoom */
+.sheetbox .staff{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+.staff path{fill:none;stroke:var(--amber);stroke-width:2.2;opacity:.3}
+/* cabeçalho impresso na folha: escala junto com a caixa, e a tinta passa por cima */
+.sheetbox .pagehead{position:absolute;left:5%;right:5%;top:2.2%;pointer-events:none;user-select:none;
+  padding-bottom:calc(var(--s,.5)*12px);border-bottom:1px solid rgba(255,255,255,.11)}
+.pagehead b,.pagehead i{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pagehead b{font-weight:700;letter-spacing:-.01em;color:#e6ecf3;font-size:calc(var(--s,.5)*34px);line-height:1.15}
+.pagehead i{font-style:normal;color:var(--dim);font-size:calc(var(--s,.5)*24px);line-height:1.25}
+.pagehead i:empty{display:none}
+.sheetbox canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#c-live{touch-action:pan-x pan-y}
+#c-live.finger{touch-action:none}
+.blank{position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);text-align:center;padding:30px;gap:10px}
+
+/* ---------- modais e toast ---------- */
+.veil{position:fixed;inset:0;background:rgba(0,0,0,.72);display:grid;place-items:center;z-index:60;padding:18px}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;width:100%;max-width:420px;
+  box-shadow:0 30px 70px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:13px;
+  max-height:calc(100vh - 36px);overflow-y:auto}
+.modal h3{font-size:17px;font-weight:700}
+.modal .end{display:flex;justify-content:flex-end;gap:9px;padding-top:4px}
+.pick{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:11px 13px;border-radius:var(--r);border:1px solid var(--line);background:var(--panel2);font-weight:600}
+.pick:hover:not(:disabled){border-color:var(--amber)}
+.pick:disabled{opacity:.45;cursor:default}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+  background:var(--amber);color:var(--amber-ink);padding:11px 20px;border-radius:999px;font-weight:700;font-size:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.45);opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+.check{display:flex;align-items:center;gap:12px;padding:11px 16px;cursor:pointer;border-top:1px solid var(--line)}
+.check:hover{background:#171c23}
+.check input{position:absolute;opacity:0;pointer-events:none}
+.box{width:21px;height:21px;border-radius:6px;border:2px solid #3d4857;display:grid;place-items:center;flex:none;color:var(--amber-ink)}
+.check input:checked+.box{background:var(--amber);border-color:var(--amber)}
+.box .icon{display:none;width:14px;height:14px}
+.check input:checked+.box .icon{display:block}
+.bar{height:5px;border-radius:5px;background:var(--panel2);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--amber)}
+
+@media (max-width:760px){
+  .side{width:100%}
+  #v-show{flex-direction:column}
+  #v-show.showing .side{display:none}
+  #v-show:not(.showing) .desk{display:none}
+  .split{display:none}
+  .tool.narrow{display:grid}
+  .brand span{display:none}
+}
+</style>
+</head>
+<body>
+
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="s-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+<symbol id="s-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+<symbol id="s-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="s-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 11l5 5 5-5M12 16V4"/></symbol>
+<symbol id="s-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5M12 4v12"/></symbol>
+<symbol id="s-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></symbol>
+<symbol id="s-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="s-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></symbol>
+<symbol id="s-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1L19.5 7.5a2.1 2.1 0 0 0-3-3L5 16z"/><path d="M14 6l3 3"/></symbol>
+<symbol id="s-erase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 20H9l-6-6 9-9 9 9-6 6"/><path d="M13 8l3 3"/></symbol>
+<symbol id="s-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h10a4 4 0 0 1 0 8h-6M8 5L4 9l4 4"/></symbol>
+<symbol id="s-grip" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></symbol>
+<symbol id="s-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+<symbol id="s-staff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 5h18M3 9.5h18M3 14h18M3 18.5h18"/></symbol>
+<symbol id="s-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></symbol>
+<symbol id="s-paste" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9.5 4V2.8h5V4"/><path d="M9 11.5h6M9 15.5h4"/></symbol>
+<symbol id="s-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h13M12 5l7 7-7 7"/></symbol>
+<symbol id="s-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12H5M12 19l-7-7 7-7"/></symbol>
+<symbol id="s-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11m0-.5V4.5a1.5 1.5 0 0 1 3 0V11m0-.5v-1a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6v-3a1.5 1.5 0 0 1 3-.5"/></symbol>
+<symbol id="s-tune" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M19 7h1M4 17h3M13 17h7"/><circle cx="16" cy="7" r="2.4"/><circle cx="10" cy="17" r="2.4"/></symbol>
+</defs></svg>
+
+<header class="topbar" id="topbar">
+  <div class="brand"><svg class="icon"><use href="#s-note"/></svg><span>Setlist</span></div>
+  <div class="tabs" id="tabs">
+    <button id="tab-songs" onclick="app.go('songs')"><svg class="icon"><use href="#s-note"/></svg>Músicas</button>
+    <button id="tab-sets" onclick="app.go('sets')"><svg class="icon"><use href="#s-list"/></svg>Repertórios</button>
+  </div>
+</header>
+
+<div class="stage">
+
+  <!-- MÚSICAS -->
+  <section class="view hide" id="v-songs">
+    <div class="wrap">
+      <div class="card pad" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px">
+          <h2 class="head">Adicionar músicas</h2>
+          <span class="sub">Uma por linha: <span class="mono">Artista - Música</span></span>
+        </div>
+        <textarea id="bulk" class="field" rows="3" placeholder="Iron Maiden - The Trooper&#10;Blink-182 - All the Small Things"></textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px">
+          <button class="btn primary" onclick="app.addBulk()"><svg class="icon"><use href="#s-plus"/></svg>Adicionar</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <div class="search grow" style="min-width:200px">
+          <svg class="icon"><use href="#s-search"/></svg>
+          <input class="field" id="q-songs" placeholder="Buscar no acervo…" oninput="app.drawSongs()">
+        </div>
+        <label class="sr-only" for="sort-songs">Ordenar por</label>
+        <select class="field" id="sort-songs" onchange="app.setSort(this.value)">
+          <option value="title">Música (A–Z)</option>
+          <option value="band">Artista (A–Z)</option>
+          <option value="added">Ordem de inclusão</option>
+        </select>
+        <button class="btn" onclick="app.exportAll()"><svg class="icon"><use href="#s-out"/></svg>Backup</button>
+        <button class="btn" onclick="document.getElementById('file-in').click()"><svg class="icon"><use href="#s-in"/></svg>Importar</button>
+        <input type="file" id="file-in" accept=".json,application/json" class="hide" onchange="app.importFile(this)">
+      </div>
+
+      <div class="card">
+        <div class="row" style="background:none">
+          <span class="eyebrow grow">Acervo · <span id="n-songs">0</span> músicas</span>
+          <span class="sub mono" id="usage"></span>
+        </div>
+        <div class="bar" style="margin:0 16px 12px"><i id="usage-bar" style="width:0"></i></div>
+        <div id="songs"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPERTÓRIOS -->
+  <section class="view hide" id="v-sets">
+    <div class="wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px">
+        <h2 class="head">Repertórios</h2>
+        <button class="btn primary" onclick="app.newSet()"><svg class="icon"><use href="#s-plus"/></svg>Novo repertório</button>
+      </div>
+      <div class="search" style="max-width:420px;margin-bottom:16px">
+        <svg class="icon"><use href="#s-search"/></svg>
+        <input class="field" id="q-sets" placeholder="Buscar repertório…" oninput="app.drawSets()">
+      </div>
+      <div class="card">
+        <div class="row" style="background:none"><span class="eyebrow grow"><span id="n-sets">0</span> repertórios</span></div>
+        <div id="sets"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDITOR DE REPERTÓRIO -->
+  <section class="view hide" id="v-editor">
+    <div class="wrap">
+      <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:16px">
+        <button class="btn quiet" onclick="app.closeEditor()" style="margin-top:2px"><svg class="icon"><use href="#s-x"/></svg></button>
+        <div class="grow" style="display:flex;flex-direction:column;gap:8px">
+          <input class="field" id="set-name" placeholder="Nome do repertório (ex: Bar do Zé)" style="font-weight:700;font-size:17px">
+          <input class="field" id="set-band" placeholder="Banda / projeto (opcional)">
+        </div>
+        <button class="btn primary" onclick="app.saveSet()" style="margin-top:2px">Salvar</button>
+      </div>
+      <div class="tabs" id="edit-modes" style="margin:0 0 14px;display:inline-flex">
+        <button id="em-pick" onclick="app.editMode('pick')"><svg class="icon"><use href="#s-list"/></svg>Escolher do acervo</button>
+        <button id="em-paste" onclick="app.editMode('paste')"><svg class="icon"><use href="#s-paste"/></svg>Colar lista</button>
+      </div>
+
+      <div id="pane-pick">
+        <div class="search" style="margin-bottom:12px">
+          <svg class="icon"><use href="#s-search"/></svg>
+          <input class="field" id="q-editor" placeholder="Filtrar músicas…" oninput="app.drawEditor()">
+        </div>
+        <p class="eyebrow" style="margin-bottom:8px">Marque as músicas deste show · <span id="n-picked">0</span> selecionadas</p>
+        <div class="card" id="editor-list" style="overflow:hidden"></div>
+      </div>
+
+      <div id="pane-paste" class="hide">
+        <div class="card pad">
+          <textarea class="field" id="paste-list" rows="9" placeholder="1. Iron Maiden - The Trooper&#10;2) Back in Black&#10;- Sweet Child O' Mine"></textarea>
+          <p class="sub" style="margin-top:10px">Uma por linha, na ordem do show. A numeração é ignorada e a linha pode vir só com o nome da música. O que já está no acervo entra com as anotações; o que não está é criado com a folha em branco.</p>
+          <div style="display:flex;justify-content:flex-end;margin-top:12px">
+            <button class="btn primary" onclick="app.addPasted()"><svg class="icon"><use href="#s-plus"/></svg>Adicionar à seleção</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODO SHOW -->
+  <section class="view hide" id="v-show">
+    <aside class="side">
+      <header>
+        <button class="tool" onclick="app.leaveShow()" title="Sair do show"><svg class="icon"><use href="#s-back"/></svg></button>
+        <div class="grow">
+          <div id="show-name">Show</div>
+          <div id="show-info">—</div>
+        </div>
+        <button class="tool hide" id="btn-addsongs" onclick="app.editSet(app.cur.setId)" title="Adicionar músicas"><svg class="icon"><use href="#s-plus"/></svg></button>
+      </header>
+      <div class="list" id="show-list"></div>
+    </aside>
+
+    <div class="split" id="split" title="Arraste para mudar a proporção"></div>
+
+    <div class="desk" id="desk">
+      <div class="tools">
+        <button class="tool narrow" onclick="app.backToList()" title="Voltar à lista"><svg class="icon"><use href="#s-back"/></svg></button>
+        <button class="tool" id="t-pen" onclick="app.setTool('pen')" title="Caneta"><svg class="icon"><use href="#s-pen"/></svg></button>
+        <button class="tool" id="t-erase" onclick="app.setTool('erase')" title="Borracha"><svg class="icon"><use href="#s-erase"/></svg></button>
+        <span class="sep"></span>
+        <div style="display:flex;gap:5px" id="swatches"></div>
+        <span class="sep"></span>
+        <button class="tool" onclick="app.undo()" title="Desfazer"><svg class="icon"><use href="#s-undo"/></svg></button>
+        <button class="tool" onclick="app.askClear()" title="Apagar a página inteira"><svg class="icon"><use href="#s-trash"/></svg></button>
+        <button class="tool" id="t-staff" onclick="app.toggleStaff()" title="Pauta"><svg class="icon"><use href="#s-staff"/></svg></button>
+        <button class="tool" id="t-finger" onclick="app.toggleFinger()" title="Desenhar com o dedo"><svg class="icon"><use href="#s-hand"/></svg></button>
+        <span class="sep"></span>
+        <div class="zoom">
+          <button onclick="app.zoomBy(-1)" title="Diminuir">−</button>
+          <span class="mono" id="zoom-n">100%</span>
+          <button onclick="app.zoomBy(1)" title="Aumentar">+</button>
+          <button onclick="app.zoomFit()" title="Caber na tela" style="font-size:12px">Fit</button>
+        </div>
+      </div>
+
+      <div class="deskbody" id="deskbody">
+        <div class="blank" id="blank">
+          <svg class="icon" style="font-size:34px;opacity:.5"><use href="#s-pen"/></svg>
+          <p>Escolha uma música à esquerda para abrir a folha.<br><span class="sub">Pedal / setas / espaço trocam de música.</span></p>
+        </div>
+        <div class="sheetbox hide" id="sheet">
+          <svg class="staff hide" id="staff" viewBox="0 0 1240 1754" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div class="pagehead"><b id="page-title"></b><i id="page-band"></i></div>
+          <canvas id="c-base"></canvas>
+          <canvas id="c-live"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- modal: enviar para repertório -->
+<div class="veil hide" id="m-send"><div class="modal">
+  <h3>Enviar para…</h3>
+  <div id="send-opts" style="display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto"></div>
+  <div class="end"><button class="btn" onclick="app.close('m-send')">Fechar</button></div>
+</div></div>
+
+<!-- modal: editar música -->
+<div class="veil hide" id="m-song"><div class="modal">
+  <h3>Editar música</h3>
+  <input class="field" id="e-title" placeholder="Título">
+  <input class="field" id="e-band" placeholder="Artista">
+  <div class="end">
+    <button class="btn" onclick="app.close('m-song')">Cancelar</button>
+    <button class="btn primary" onclick="app.saveSong()">Salvar</button>
+  </div>
+</div></div>
+
+<!-- modal: confirmação -->
+<div class="veil hide" id="m-ask"><div class="modal" style="max-width:380px">
+  <h3 id="ask-text" style="font-weight:600;line-height:1.5"></h3>
+  <div class="end">
+    <button class="btn" onclick="app.close('m-ask')">Cancelar</button>
+    <button class="btn primary" id="ask-ok">Confirmar</button>
+  </div>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ============ util ============ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const r1 = n => Math.round(n * 10) / 10;
+const clamp = (n, a, b) => n < a ? a : n > b ? b : n;
+const key = (b, t) => (b + '|' + t).toLowerCase();
+
+const W = 1240, H = 1754;          // folha A4 a ~150 dpi (resolução fixa: o desenho nunca é reamostrado)
+const STEP = 1.5;                  // px mínimos entre amostras — descarta pontos colados
+const ERASER = 26;                 // raio da borracha, em px de folha
+const ALL = '__all__';             // repertório virtual "todas as músicas"
+const KEY = 'setlistPro3', KEY_OLD = 'setlistAppDataV2', KEY_UI = 'setlistProUi';
+const QUOTA = 5000000;             // ~5 M de caracteres é o teto usual do localStorage
+const INKS = [['#ffffff', 'Branco'], ['#f2b13c', 'Âmbar'], ['#e8564a', 'Vermelho'], ['#4dd0e1', 'Ciano']];
+
+// localStorage pode simplesmente não existir (aba privada, file:// no Safari, cookies bloqueados).
+// Nesse caso o app tem que continuar funcionando na sessão, avisando que nada será guardado.
+const SEM_STORAGE = 'Este navegador está bloqueando o armazenamento: nada será salvo ao fechar.';
+const LS = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) {
+    try { localStorage.setItem(k, v); return 'ok'; }
+    catch (e) { return (e && (e.name === 'QuotaExceededError' || e.code === 22)) ? 'cheio' : 'bloqueado'; }
+  }
+};
+
+function uuid(p) {
+  const r = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID().replace(/-/g, '')
+    : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  return p + '_' + r;
+}
+
+/* Normaliza uma música vinda de qualquer versão anterior do arquivo.
+   Coordenadas viram inteiros e a largura ganha 1 casa: o mesmo traço ocupa ~4x menos
+   no JSON, e 0,17 mm de precisão numa folha A4 é mais do que a caneta resolve. */
+// Lê a lista que o bandleader manda no WhatsApp. Aceita "1. Artista - Música",
+// "- Música" ou só o nome. A numeração só é descartada quando vem seguida de
+// pontuação, senão "4 Non Blondes - What's Up" viraria "Non Blondes".
+function parseList(texto) {
+  const out = [];
+  for (let linha of String(texto || '').split('\n')) {
+    linha = linha.trim();
+    if (!linha) continue;
+    linha = linha.replace(/^\d{1,3}\s*[.)\]:\-–—]\s+/, '').replace(/^[-–—•*]\s+/, '').trim();
+    if (!linha) continue;
+    const m = linha.match(/^(.*?)\s+[-–—]\s+(.+)$/);
+    if (m && m[1].trim() && m[2].trim()) out.push({ band: m[1].trim(), title: m[2].trim() });
+    else out.push({ band: '', title: linha });
+  }
+  return out;
+}
+
+function normSong(raw) {
+  const s = raw || {};
+  const o = {
+    id: s.id || uuid('s'),
+    band: String(s.band || '').trim(),
+    title: String(s.title || '').trim(),
+    // tom/bpm/dur não têm mais interface, mas ficam guardados para não perder dado antigo
+    tom: String(s.tom || '').trim(),
+    bpm: String(s.bpm || '').trim(),
+    dur: Number(s.dur != null ? s.dur : s.duration) || 0,
+    strokes: [],
+    legacy: s.legacy || s.drawingData || null   // anotação antiga em PNG vira fundo da folha
+  };
+  const src = Array.isArray(s.strokes) ? s.strokes : [];
+  for (const st of src) {
+    if (!st || !Array.isArray(st.p)) continue;
+    const p = [];
+    if (Array.isArray(st.p[0])) {
+      for (const q of st.p) p.push(Math.round(q[0] || 0), Math.round(q[1] || 0), r1(q[2] || 2));
+    } else {
+      for (let i = 0; i + 2 < st.p.length; i += 3) p.push(Math.round(st.p[i]), Math.round(st.p[i + 1]), r1(st.p[i + 2] || 2));
+    }
+    if (p.length >= 3) o.strokes.push({ c: st.c || '#ffffff', p });
+  }
+  return o;
+}
+function normSet(raw) {
+  const t = raw || {};
+  return {
+    id: t.id || uuid('r'),
+    name: String(t.name || 'Sem nome').trim() || 'Sem nome',
+    band: String(t.band || '').trim(),
+    songIds: Array.isArray(t.songIds) ? t.songIds.slice() : []
+  };
+}
+
+/* ============ app ============ */
+const app = {
+  data: { songs: [], sets: [] },
+  ui: { staff: false, finger: false, ink: '#ffffff', sort: 'title', sideW: 270 },
+  cur: { view: 'songs', setId: null, songId: null, editSetId: null, editSongId: null, backToShow: false, picked: new Set() },
+
+  base: null, bctx: null, live: null, lctx: null,
+  tool: 'pen', ink: '#ffffff', zoom: 1, fitW: 600,
+  ptr: null, stroke: null, wasErase: false, erased: false,
+  undos: [], legacyCache: new Map(),
+  wakeRef: null, bytes: 0, warned: false, storageOk: true,
+  _save: 0, _raf: 0, _toast: 0, _unsort: null,
+
+  init() {
+    // sem console num tablet: qualquer erro solto vira aviso na tela
+    addEventListener('error', e => { try { this.toast('Erro: ' + (e.message || e.type)); } catch (_) { } });
+    this.storageOk = LS.set('__probe', '1') === 'ok';
+    if (this.storageOk) { try { localStorage.removeItem('__probe'); } catch (e) { } }
+    else { this.warned = true; setTimeout(() => this.toast(SEM_STORAGE), 500); }
+    this.loadUi();
+    this.load();
+    this.initCanvas();
+    this.paintInks();
+    this.setTool('pen');
+    const sel = $('sort-songs'); if (sel) sel.value = this.ui.sort;
+    this.bindKeys();
+    addEventListener('resize', () => this.layout());
+    addEventListener('beforeunload', () => this.flush());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') { this.flush(); this.dropWake(); }
+      else if (this.cur.view === 'show') this.wake();
+    });
+    this.go('songs');
+  },
+
+  /* ---------- dados ---------- */
+  loadUi() {
+    try {
+      const u = JSON.parse(LS.get(KEY_UI) || '{}');
+      if (typeof u.staff === 'boolean') this.ui.staff = u.staff;
+      if (typeof u.finger === 'boolean') this.ui.finger = u.finger;
+      if (typeof u.ink === 'string') this.ui.ink = u.ink;
+      if (typeof u.sort === 'string') this.ui.sort = u.sort;
+      if (typeof u.sideW === 'number') this.ui.sideW = u.sideW;
+    } catch (e) { }
+    this.ink = this.ui.ink;
+  },
+  saveUi() { LS.set(KEY_UI, JSON.stringify(this.ui)); },
+
+  load() {
+    let raw = LS.get(KEY);
+    const fromOld = !raw;
+    if (fromOld) raw = LS.get(KEY_OLD);
+    let d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) { }
+    const songs = d && Array.isArray(d.songs) ? d.songs : [];
+    const sets = d && Array.isArray(d.sets) ? d.sets : (d && Array.isArray(d.setlists) ? d.setlists : []);
+    this.data = {
+      songs: songs.map(normSong).filter(s => s.title || s.band),
+      sets: sets.map(normSet)
+    };
+    const live = new Set(this.data.songs.map(s => s.id));
+    for (const st of this.data.sets) st.songIds = st.songIds.filter(i => live.has(i));
+    // Grava já na chave nova. A antiga fica intacta como rede de segurança.
+    if (fromOld && raw) this.saveNow();
+    else this.bytes = raw ? raw.length : 0;
+  },
+
+  save() { clearTimeout(this._save); this._save = setTimeout(() => this.saveNow(), 600); },
+
+  saveNow() {
+    clearTimeout(this._save);
+    const json = JSON.stringify(this.data);
+    this.bytes = json.length;
+    const r = LS.set(KEY, json);
+    if (r === 'ok') this.warned = false;
+    else if (!this.warned) {
+      this.warned = true;
+      this.toast(r === 'cheio' ? 'Armazenamento cheio. Faça um backup e apague anotações antigas.' : SEM_STORAGE);
+    }
+    if (this.cur.view === 'songs') this.paintUsage();
+  },
+
+  flush() { this.bake(); if (this._save) this.saveNow(); },
+
+  byId(id) { return this.data.songs.find(s => s.id === id); },
+  set(id) { return this.data.sets.find(s => s.id === id); },
+  song() { return this.byId(this.cur.songId); },
+  // ordem da lista geral: por música, por artista, ou como foram incluídas
+  ordered() {
+    const a = this.data.songs.slice();
+    if (this.ui.sort === 'added') return a;
+    if (this.ui.sort === 'band') return a.sort((x, y) => x.band.localeCompare(y.band, 'pt') || x.title.localeCompare(y.title, 'pt'));
+    return a.sort((x, y) => x.title.localeCompare(y.title, 'pt') || x.band.localeCompare(y.band, 'pt'));
+  },
+  setSort(v) { this.ui.sort = v; this.saveUi(); this.drawSongs(); },
+  marked(s) { return !!(s && (s.strokes.length || s.legacy)); },
+
+  /* ---------- navegação ---------- */
+  go(v) {
+    if (this.cur.view === 'show' && v !== 'show') this.flush();
+    this.cur.view = v;
+    ['v-songs', 'v-sets', 'v-editor', 'v-show'].forEach(id => $(id).classList.add('hide'));
+    $('v-' + v).classList.remove('hide');
+    $('topbar').classList.toggle('hide', v === 'show');   // no palco, cada pixel vai para a folha
+    $('tabs').classList.toggle('hide', v === 'show' || v === 'editor');
+    $('tab-songs').classList.toggle('on', v === 'songs');
+    $('tab-sets').classList.toggle('on', v === 'sets');
+    if (v === 'songs') { this.drawSongs(); this.paintUsage(); }
+    else if (v === 'sets') this.drawSets();
+    else if (v === 'editor') this.drawEditor();
+    else if (v === 'show') { this.drawShowList(); this.layout(); }
+  },
+
+  /* ---------- acervo ---------- */
+  drawSongs() {
+    const q = ($('q-songs').value || '').trim().toLowerCase();
+    const list = this.ordered().filter(s => !q || (s.title + ' ' + s.band).toLowerCase().indexOf(q) >= 0);
+    $('n-songs').textContent = this.data.songs.length;
+    $('songs').innerHTML = list.length ? list.map(s => `
+      <div class="row">
+        <div class="grow">
+          <div class="tt">${esc(s.title)}${this.marked(s) ? '<span class="dot" title="tem anotações"></span>' : ''}</div>
+          <div class="meta">${esc(s.band) || '—'}</div>
+        </div>
+        <div class="acts">
+          <button class="btn sm" onclick="app.openSong('${s.id}')"><svg class="icon"><use href="#s-pen"/></svg>Anotar</button>
+          <button class="btn sm quiet" onclick="app.send('${s.id}')" title="Enviar para um repertório"><svg class="icon"><use href="#s-send"/></svg></button>
+          <button class="btn sm quiet" onclick="app.editSong('${s.id}')" title="Editar dados"><svg class="icon"><use href="#s-tune"/></svg></button>
+          <button class="btn sm quiet danger" onclick="app.delSong('${s.id}')" title="Excluir"><svg class="icon"><use href="#s-trash"/></svg></button>
+        </div>
+      </div>`).join('')
+      : `<p class="empty">${this.data.songs.length ? 'Nada encontrado.' : 'Cole sua lista no campo acima para começar.'}</p>`;
+  },
+
+  paintUsage() {
+    if (!this.storageOk) {
+      $('usage').textContent = 'armazenamento indisponível — exporte um backup antes de fechar';
+      $('usage-bar').style.width = '0';
+      return;
+    }
+    const pct = clamp(this.bytes / QUOTA * 100, 0, 100);
+    let leg = 0;
+    for (const s of this.data.songs) if (s.legacy) leg += s.legacy.length;
+    $('usage').textContent = (this.bytes / 1024).toFixed(0) + ' KB de ~5 MB'
+      + (leg ? ' · ' + (leg / 1024).toFixed(0) + ' KB são anotações antigas em imagem' : '');
+    const bar = $('usage-bar');
+    bar.style.width = pct.toFixed(1) + '%';
+    bar.style.background = pct > 85 ? 'var(--red)' : 'var(--amber)';
+  },
+
+  addBulk() {
+    const ta = $('bulk');
+    const seen = new Set(this.data.songs.map(s => key(s.band, s.title)));
+    let add = 0, dup = 0, bad = 0;
+    for (const line of ta.value.split('\n')) {
+      const t = line.trim();
+      if (!t) continue;
+      // separa no primeiro " - ", preservando hífens do nome (Blink-182, AC/DC…)
+      const m = t.match(/^(.*?)\s+[-–—]\s+(.+)$/);
+      if (!m) { bad++; continue; }
+      const band = m[1].trim(), title = m[2].trim();
+      if (!band || !title) { bad++; continue; }
+      const k = key(band, title);
+      if (seen.has(k)) { dup++; continue; }
+      seen.add(k);
+      this.data.songs.push(normSong({ band, title }));
+      add++;
+    }
+    if (!add && !dup && !bad) return;
+    if (!add && bad && !dup) { this.toast('Use o formato "Artista - Música", com espaços em volta do hífen.'); return; }
+    ta.value = '';
+    this.saveNow();
+    this.drawSongs();
+    let m = add + (add === 1 ? ' música adicionada' : ' músicas adicionadas');
+    if (dup) m += ' · ' + dup + ' já existiam';
+    if (bad) m += ' · ' + bad + ' sem separador';
+    this.toast(m);
+  },
+
+  delSong(id) {
+    const s = this.byId(id);
+    if (!s) return;
+    this.ask('Excluir "' + s.title + '"? Sai de todos os repertórios e as anotações vão junto.', () => {
+      this.data.songs = this.data.songs.filter(x => x.id !== id);
+      for (const st of this.data.sets) st.songIds = st.songIds.filter(i => i !== id);
+      this.legacyCache.delete(id);
+      if (this.cur.songId === id) this.blank();
+      this.saveNow();
+      this.drawSongs();
+    });
+  },
+
+  editSong(id) {
+    const s = this.byId(id);
+    if (!s) return;
+    this.cur.editSongId = id;
+    $('e-title').value = s.title;
+    $('e-band').value = s.band;
+    $('m-song').classList.remove('hide');
+    $('e-title').focus();
+  },
+
+  saveSong() {
+    const s = this.byId(this.cur.editSongId);
+    if (!s) return;
+    const t = $('e-title').value.trim();
+    if (!t) { this.toast('A música precisa de um título.'); return; }
+    s.title = t;
+    s.band = $('e-band').value.trim();
+    this.saveNow();
+    this.close('m-song');
+    if (this.cur.view === 'songs') this.drawSongs();
+    if (this.cur.view === 'show') { this.drawShowList(); if (this.cur.songId === s.id) this.nowPlaying(s); }
+    this.toast('Música atualizada.');
+  },
+
+  send(songId) {
+    const box = $('send-opts');
+    if (!this.data.sets.length) {
+      box.innerHTML = '<p class="empty">Nenhum repertório ainda. Crie um na aba Repertórios.</p>';
+    } else {
+      box.innerHTML = this.data.sets.map(st => {
+        const has = st.songIds.indexOf(songId) >= 0;
+        return `<button class="pick" ${has ? 'disabled' : ''} onclick="app.sendTo('${st.id}','${songId}')">
+          <span>${esc(st.name)}</span>
+          <svg class="icon" style="color:${has ? 'var(--amber)' : 'var(--faint)'}"><use href="#${has ? 's-check' : 's-plus'}"/></svg>
+        </button>`;
+      }).join('');
+    }
+    $('m-send').classList.remove('hide');
+  },
+
+  sendTo(setId, songId) {
+    const st = this.set(setId);
+    if (st && st.songIds.indexOf(songId) < 0) {
+      st.songIds.push(songId);
+      this.saveNow();
+      this.toast('Adicionada a ' + st.name + '.');
+    }
+    this.close('m-send');
+  },
+
+  /* ---------- repertórios ---------- */
+  drawSets() {
+    const q = ($('q-sets').value || '').trim().toLowerCase();
+    const list = this.data.sets.filter(st => !q || (st.name + ' ' + st.band).toLowerCase().indexOf(q) >= 0);
+    $('n-sets').textContent = this.data.sets.length;
+    $('sets').innerHTML = list.length ? list.map(st => `
+      <div class="row">
+        <div class="grow" style="cursor:pointer" onclick="app.openShow('${st.id}')">
+          <div class="tt">${esc(st.name)}</div>
+          <div class="meta">${st.songIds.length} música${st.songIds.length === 1 ? '' : 's'}${st.band ? ' · ' + esc(st.band) : ''}</div>
+        </div>
+        <div class="acts">
+          <button class="btn sm quiet" onclick="app.editSet('${st.id}')" title="Editar"><svg class="icon"><use href="#s-tune"/></svg></button>
+          <button class="btn sm quiet" onclick="app.dupSet('${st.id}')" title="Duplicar"><svg class="icon"><use href="#s-copy"/></svg></button>
+          <button class="btn sm quiet" onclick="app.exportSet('${st.id}')" title="Exportar"><svg class="icon"><use href="#s-out"/></svg></button>
+          <button class="btn sm quiet danger" onclick="app.delSet('${st.id}')" title="Excluir"><svg class="icon"><use href="#s-trash"/></svg></button>
+        </div>
+      </div>`).join('')
+      : `<p class="empty">${this.data.sets.length ? 'Nada encontrado.' : 'Nenhum repertório ainda. Crie um em "Novo repertório".'}</p>`;
+  },
+
+  dupSet(id) {
+    const src = this.set(id);
+    if (!src) return;
+    this.data.sets.push(normSet({ name: this.freeName(src.name), band: src.band, songIds: src.songIds }));
+    this.saveNow();
+    this.drawSets();
+    this.toast('Repertório duplicado.');
+  },
+
+  delSet(id) {
+    const st = this.set(id);
+    if (!st) return;
+    this.ask('Excluir o repertório "' + st.name + '"? As músicas continuam no acervo.', () => {
+      this.data.sets = this.data.sets.filter(x => x.id !== id);
+      this.saveNow();
+      this.drawSets();
+    });
+  },
+
+  freeName(n) {
+    n = String(n || 'Repertório').trim() || 'Repertório';
+    let x = n, i = 2;
+    while (this.data.sets.some(s => s.name === x)) x = n + ' (' + (i++) + ')';
+    return x;
+  },
+
+  // duas formas de povoar a mesma seleção: marcar no acervo ou colar a lista
+  editMode(m) {
+    const paste = m === 'paste';
+    this.cur.mode = paste ? 'paste' : 'pick';
+    $('em-pick').classList.toggle('on', !paste);
+    $('em-paste').classList.toggle('on', paste);
+    $('pane-pick').classList.toggle('hide', paste);
+    $('pane-paste').classList.toggle('hide', !paste);
+    if (paste) $('paste-list').focus();
+  },
+
+  // Resolve as linhas contra o acervo e joga tudo na seleção, na ordem colada.
+  // Cria o que faltar, para você conferir marcado antes de salvar.
+  addPasted() {
+    const itens = parseList($('paste-list').value);
+    if (!itens.length) { this.toast('Cole a lista, uma música por linha.'); return; }
+    let novas = 0, add = 0;
+    for (const it of itens) {
+      let s = it.band
+        ? this.data.songs.find(x => key(x.band, x.title) === key(it.band, it.title))
+        : this.data.songs.find(x => x.title.toLowerCase() === it.title.toLowerCase());
+      if (!s) { s = normSong({ band: it.band, title: it.title }); this.data.songs.push(s); novas++; }
+      if (!this.cur.picked.has(s.id)) { this.cur.picked.add(s.id); add++; }
+    }
+    if (novas) this.saveNow();
+    $('paste-list').value = '';
+    this.editMode('pick');
+    this.drawEditor();
+    this.toast(add
+      ? add + ' na seleção · ' + (add - novas) + ' do acervo, ' + novas + (novas === 1 ? ' criada' : ' criadas')
+      : 'Todas já estavam na seleção.');
+  },
+
+  newSet() {
+    this.cur.editSetId = null;
+    this.cur.backToShow = false;
+    this.cur.picked = new Set();
+    $('set-name').value = '';
+    $('set-band').value = '';
+    $('q-editor').value = '';
+    $('paste-list').value = '';
+    this.editMode('pick');
+    this.go('editor');
+    $('set-name').focus();
+  },
+
+  editSet(id) {
+    const st = this.set(id);
+    if (!st) return;
+    this.cur.backToShow = this.cur.view === 'show';
+    this.cur.editSetId = id;
+    this.cur.picked = new Set(st.songIds);
+    $('set-name').value = st.name;
+    $('set-band').value = st.band;
+    $('q-editor').value = '';
+    $('paste-list').value = '';
+    this.editMode('pick');
+    this.go('editor');
+  },
+
+  drawEditor() {
+    const q = ($('q-editor').value || '').trim().toLowerCase();
+    const list = this.ordered().filter(s => !q || (s.title + ' ' + s.band).toLowerCase().indexOf(q) >= 0);
+    $('n-picked').textContent = this.cur.picked.size;
+    $('editor-list').innerHTML = list.length ? list.map(s => `
+      <label class="check">
+        <input type="checkbox" ${this.cur.picked.has(s.id) ? 'checked' : ''} onchange="app.togglePick('${s.id}',this.checked)">
+        <span class="box"><svg class="icon"><use href="#s-check"/></svg></span>
+        <span class="grow">
+          <span class="tt" style="display:block">${esc(s.title)}</span>
+          <span class="meta" style="display:block">${esc(s.band) || '—'}</span>
+        </span>
+      </label>`).join('')
+      : `<p class="empty">${this.data.songs.length ? 'Nada encontrado.' : 'Cadastre músicas primeiro, na aba Músicas.'}</p>`;
+  },
+
+  togglePick(id, on) {
+    on ? this.cur.picked.add(id) : this.cur.picked.delete(id);
+    $('n-picked').textContent = this.cur.picked.size;
+  },
+
+  saveSet() {
+    const name = $('set-name').value.trim();
+    const band = $('set-band').value.trim();
+    if (!name) { this.toast('Dê um nome ao repertório.'); return; }
+    if (!this.cur.picked.size) { this.toast('Escolha pelo menos uma música.'); return; }
+
+    // picked é um Set: guarda a ordem de entrada. Vindo de um repertório existente
+    // ele nasce na ordem já arrastada; o que é marcado ou colado depois entra no fim.
+    const old = this.set(this.cur.editSetId);
+    const vivos = new Set(this.data.songs.map(s => s.id));
+    const ids = Array.from(this.cur.picked).filter(i => vivos.has(i));
+
+    if (old) {
+      old.name = name; old.band = band; old.songIds = ids;
+      this.saveNow();
+      this.toast('Repertório atualizado.');
+      if (this.cur.backToShow) { this.openShow(old.id); return; }
+    } else {
+      this.data.sets.push(normSet({ name: this.freeName(name), band, songIds: ids }));
+      this.saveNow();
+      this.toast('Repertório criado.');
+    }
+    this.go('sets');
+  },
+
+  closeEditor() {
+    if (this.cur.backToShow && this.cur.editSetId) this.openShow(this.cur.editSetId);
+    else this.go('sets');
+  },
+
+  /* ---------- modo show ---------- */
+  openShow(setId) {
+    this.cur.setId = setId;
+    this.cur.songId = null;
+    this.go('show');
+    this.sortable();
+    this.stageMode();
+    this.setSideW(this.ui.sideW);
+    const ids = this.ids();
+    ids.length ? this.pick(ids[0]) : this.blank();
+    $('v-show').classList.remove('showing');   // num celular, começa mostrando a lista
+  },
+
+  openSong(songId) {          // folha de uma música avulsa, direto do acervo
+    this.cur.setId = ALL;
+    this.cur.songId = null;
+    this.go('show');
+    this.sortable();
+    this.stageMode();
+    this.pick(songId);
+  },
+
+  leaveShow() {
+    this.flush();
+    this.dropWake();
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => { });
+    $('v-show').classList.remove('showing');
+    this.go(this.cur.setId === ALL ? 'songs' : 'sets');
+  },
+
+  stageMode() {
+    const el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => { });
+    try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => { }); } catch (e) { }
+    this.wake();
+  },
+  wake() {
+    if (!navigator.wakeLock || this.wakeRef) return;
+    navigator.wakeLock.request('screen').then(w => { this.wakeRef = w; }).catch(() => { });
+  },
+  dropWake() {
+    if (!this.wakeRef) return;
+    try { this.wakeRef.release(); } catch (e) { }
+    this.wakeRef = null;
+  },
+
+  ids() {
+    if (this.cur.setId === ALL) return this.ordered().map(s => s.id);
+    const st = this.set(this.cur.setId);
+    return st ? st.songIds.slice() : [];
+  },
+
+  drawShowList() {
+    const isAll = this.cur.setId === ALL;
+    const st = isAll ? null : this.set(this.cur.setId);
+    const list = this.ids().map(i => this.byId(i)).filter(Boolean);
+
+    $('show-name').textContent = isAll ? 'Todas as músicas' : (st ? st.name : 'Repertório');
+    $('show-info').textContent = isAll
+      ? list.length + ' no acervo'
+      : list.length + ' música' + (list.length === 1 ? '' : 's') + (st && st.band ? ' · ' + st.band : '');
+    $('btn-addsongs').classList.toggle('hide', isAll);
+
+    $('show-list').innerHTML = list.length ? list.map((s, i) => `
+      <div class="song${s.id === this.cur.songId ? ' on' : ''}" data-id="${s.id}" onclick="app.pick('${s.id}')">
+        ${isAll ? '' : '<span class="grip"><svg class="icon"><use href="#s-grip"/></svg></span>'}
+        <span class="num mono">${i + 1}</span>
+        <span class="grow">
+          <span class="tt" style="font-size:14px;display:block">${esc(s.title)}${this.marked(s) ? '<span class="dot"></span>' : ''}</span>
+          <span class="meta" style="display:block">${esc(s.band)}</span>
+        </span>
+        ${isAll ? '' : `<button class="btn quiet sm" title="Tirar do repertório" onclick="event.stopPropagation();app.dropSong('${s.id}')"><svg class="icon"><use href="#s-x"/></svg></button>`}
+      </div>`).join('')
+      : '<p class="empty">Repertório vazio. Use "Músicas" para incluir.</p>';
+  },
+
+  markActive() {
+    const rows = document.querySelectorAll('#show-list .song');
+    for (const el of rows) {
+      const on = el.dataset.id === this.cur.songId;
+      el.classList.toggle('on', on);
+      if (on) el.scrollIntoView({ block: 'nearest' });
+    }
+  },
+
+  // acende/apaga o ponto de "tem anotação" só na linha atual, sem redesenhar a lista
+  dot(on) {
+    const t = document.querySelector('#show-list .song[data-id="' + this.cur.songId + '"] .tt');
+    if (!t) return;
+    const d = t.querySelector('.dot');
+    if (on && !d) t.insertAdjacentHTML('beforeend', '<span class="dot"></span>');
+    if (!on && d) d.remove();
+  },
+
+  dropSong(id) {
+    const st = this.set(this.cur.setId), s = this.byId(id);
+    if (!st || !s) return;
+    this.ask('Tirar "' + s.title + '" deste repertório? Ela continua no acervo, com as anotações.', () => {
+      st.songIds = st.songIds.filter(i => i !== id);
+      this.saveNow();
+      if (this.cur.songId === id) this.blank();
+      this.drawShowList();
+    });
+  },
+
+  nowPlaying(s) {
+    $('page-title').textContent = s.title;
+    $('page-band').textContent = s.band;
+  },
+
+  // em tela estreita a lista e a folha se alternam; nas largas as duas convivem
+  backToList() {
+    this.flush();
+    $('v-show').classList.remove('showing');
+  },
+
+  blank() {
+    this.cur.songId = null;
+    $('v-show').classList.remove('showing');
+    this.stroke = null;
+    this.undos = [];
+    if (this.lctx) this.lctx.clearRect(0, 0, W, H);
+    if (this.bctx) this.bctx.clearRect(0, 0, W, H);
+    $('sheet').classList.add('hide');
+    $('blank').classList.remove('hide');
+    $('page-title').textContent = '';
+    $('page-band').textContent = '';
+  },
+
+  pick(id) {
+    const s = this.byId(id);
+    if (!s) return;
+    if (this.cur.songId && this.cur.songId !== id) this.flush();
+    this.cur.songId = id;
+    this.undos = [];
+    this.stroke = null;
+    if (this.lctx) this.lctx.clearRect(0, 0, W, H);
+    $('blank').classList.add('hide');
+    $('sheet').classList.remove('hide');
+    $('v-show').classList.add('showing');
+    this.nowPlaying(s);
+    this.markActive();
+    this.rebuild();
+    this.layout();
+  },
+
+  step(d) {
+    const ids = this.ids();
+    if (!ids.length) return;
+    let i = ids.indexOf(this.cur.songId);
+    i = i < 0 ? (d > 0 ? 0 : ids.length - 1) : i + d;
+    if (i < 0 || i >= ids.length) return;
+    this.pick(ids[i]);
+  },
+
+  /* ---------- folha ---------- */
+  initCanvas() {
+    this.base = $('c-base'); this.live = $('c-live');
+    if (!this.base || !this.live) return;
+    this.base.width = this.live.width = W;
+    this.base.height = this.live.height = H;
+    this.bctx = this.base.getContext('2d');
+    this.lctx = this.live.getContext('2d');
+    for (const c of [this.bctx, this.lctx]) { c.lineCap = 'round'; c.lineJoin = 'round'; }
+
+    this.live.addEventListener('pointerdown', e => this.down(e));
+    this.live.addEventListener('pointermove', e => this.move(e));
+    for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) this.live.addEventListener(t, e => this.up(e));
+
+    this.live.classList.toggle('finger', this.ui.finger);
+    $('t-finger').classList.toggle('on', this.ui.finger);
+    $('staff').classList.toggle('hide', !this.ui.staff);
+    $('t-staff').classList.toggle('on', this.ui.staff);
+
+    this.buildStaff();
+    this.initSplit();
+    if (window.ResizeObserver) new ResizeObserver(() => this.layout()).observe($('desk'));
+  },
+
+  // 8 pautas, com margem generosa em cima e embaixo. Desenhadas nas coordenadas da
+  // folha (1240x1754), então o SVG escala junto com a caixa — inclusive no zoom.
+  buildStaff() {
+    const el = $('staff');
+    if (!el) return;
+    const N = 8, GAP = 15, MARGIN = 150, X0 = 62, X1 = W - 62;
+    const alto = GAP * 4;
+    const passo = (H - MARGIN * 2 - alto) / (N - 1);
+    let d = '';
+    for (let i = 0; i < N; i++) {
+      const topo = MARGIN + i * passo;
+      for (let k = 0; k < 5; k++) d += 'M' + X0 + ' ' + Math.round(topo + k * GAP) + 'H' + X1;
+    }
+    el.innerHTML = '<path d="' + d + '"/>';
+  },
+
+  // divisória arrastável entre a lista e a folha
+  initSplit() {
+    const bar = $('split');
+    if (!bar) return;
+    this.setSideW(this.ui.sideW);
+    let id = null;
+    const move = e => {
+      if (e.pointerId !== id) return;
+      this.setSideW(e.clientX - $('v-show').getBoundingClientRect().left);
+    };
+    const end = e => {
+      if (e.pointerId !== id) return;
+      id = null;
+      bar.classList.remove('on');
+      try { bar.releasePointerCapture(e.pointerId); } catch (err) { }
+      this.saveUi();
+    };
+    bar.addEventListener('pointerdown', e => {
+      id = e.pointerId;
+      bar.classList.add('on');
+      try { bar.setPointerCapture(id); } catch (err) { }
+      e.preventDefault();
+    });
+    bar.addEventListener('pointermove', move);
+    bar.addEventListener('pointerup', end);
+    bar.addEventListener('pointercancel', end);
+    bar.addEventListener('dblclick', () => { this.setSideW(270); this.saveUi(); });
+  },
+
+  setSideW(px) {
+    const host = $('v-show');
+    const largura = host.getBoundingClientRect().width || 1000;
+    const teto = Math.max(180, largura - 300);        // a folha nunca fica sem espaço
+    const w = clamp(Math.round(px) || 270, 165, teto);
+    this.ui.sideW = w;
+    host.style.setProperty('--side', w + 'px');
+    this.layout();
+  },
+
+  // A folha tem resolução fixa; só a caixa exibida muda de tamanho.
+  layout() {
+    const desk = $('desk');
+    if (!desk || $('v-show').classList.contains('hide')) return;
+    const r = desk.getBoundingClientRect();
+    const toolsH = desk.firstElementChild.getBoundingClientRect().height;
+    const aw = r.width - 20, ah = r.height - toolsH - 20;
+    if (aw <= 0 || ah <= 0) return;
+    this.fitW = Math.max(140, Math.min(aw, ah * (210 / 297)));
+    this.applyZoom();
+  },
+
+  applyZoom() {
+    const w = Math.round(this.fitW * this.zoom);
+    const h = Math.round(w * (297 / 210));
+    const box = $('sheet'), body = $('deskbody');
+    box.style.width = w + 'px';
+    box.style.height = h + 'px';
+    box.style.setProperty('--s', (w / W).toFixed(4));   // px de tela por px de folha
+    $('zoom-n').textContent = Math.round(this.zoom * 100) + '%';
+    // só centraliza quando cabe — centralizar conteúdo maior que a área corta a borda
+    body.classList.toggle('cx', w <= body.clientWidth - 18);
+    body.classList.toggle('cy', h <= body.clientHeight - 18);
+  },
+
+  zoomBy(d) { this.zoom = clamp(+(this.zoom + d * 0.25).toFixed(2), 0.5, 4); this.applyZoom(); },
+  zoomFit() { this.zoom = 1; this.layout(); },
+
+  pt(e) {
+    const r = this.live.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
+  },
+  wid(e) { return r1(2 + (e.pressure > 0 ? e.pressure : 0.5) * 9); },
+
+  down(e) {
+    if (!this.live || !this.cur.songId || this.ptr !== null) return;
+    if (e.pointerType === 'touch' && !this.ui.finger) return;   // dedo rola a folha; caneta escreve
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    this.ptr = e.pointerId;
+    try { this.live.setPointerCapture(e.pointerId); } catch (err) { }
+    this.wasErase = this.tool === 'erase';
+    this.erased = false;
+    this.snapshot();
+    const p = this.pt(e);
+    if (this.wasErase) { this.erase(p.x, p.y); this.cursor(p.x, p.y); }
+    else this.stroke = { c: this.ink, p: [Math.round(p.x), Math.round(p.y), this.wid(e)] };
+  },
+
+  move(e) {
+    if (e.pointerId !== this.ptr) return;
+    e.preventDefault();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+
+    if (this.wasErase) {
+      for (const q of evs) { const p = this.pt(q); this.erase(p.x, p.y); }
+      const p = this.pt(e);
+      this.cursor(p.x, p.y);
+      return;
+    }
+
+    const st = this.stroke;
+    if (!st) return;
+    const c = this.lctx;
+    c.strokeStyle = st.c;
+    for (const q of evs) {
+      const p = this.pt(q);
+      const n = st.p.length;
+      const lx = st.p[n - 3], ly = st.p[n - 2];
+      const dx = p.x - lx, dy = p.y - ly;
+      if (dx * dx + dy * dy < STEP * STEP) continue;
+      const x = Math.round(p.x), y = Math.round(p.y), w = this.wid(q);
+      st.p.push(x, y, w);
+      c.lineWidth = w;
+      c.beginPath(); c.moveTo(lx, ly); c.lineTo(x, y); c.stroke();
+    }
+  },
+
+  up(e) {
+    if (e.pointerId !== this.ptr) return;
+    this.ptr = null;
+    try { this.live.releasePointerCapture(e.pointerId); } catch (err) { }
+    if (this.wasErase && !this.erased) this.undos.pop();   // gesto que não apagou nada não vira undo
+    this.bake();
+    this.save();
+  },
+
+  // fecha o traço atual: entra na lista da música e é pintado na camada base
+  bake() {
+    const s = this.song();
+    if (this.stroke && s) {
+      s.strokes.push(this.stroke);
+      this.paint(this.bctx, [this.stroke]);
+      this.dot(true);
+    }
+    this.stroke = null;
+    if (this.lctx) this.lctx.clearRect(0, 0, W, H);
+  },
+
+  snapshot() {
+    const s = this.song();
+    if (!s) return;
+    // traços prontos nunca são mutados, então copiar as referências basta
+    this.undos.push({ s: s.strokes.slice(), l: s.legacy });
+    if (this.undos.length > 25) this.undos.shift();
+  },
+
+  undo() {
+    const s = this.song();
+    if (!s || !this.undos.length) { this.toast('Nada para desfazer.'); return; }
+    const u = this.undos.pop();
+    s.strokes = u.s;
+    s.legacy = u.l;
+    this.rebuild();
+    this.dot(this.marked(s));
+    this.saveNow();
+  },
+
+  hit(st, x, y, r) {
+    const p = st.p;
+    if (p.length === 3) { const dx = x - p[0], dy = y - p[1]; return dx * dx + dy * dy <= r * r; }
+    for (let i = 0; i + 5 < p.length; i += 3) {
+      const ax = p[i], ay = p[i + 1], bx = p[i + 3], by = p[i + 4];
+      const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+      let t = l2 === 0 ? 0 : ((x - ax) * dx + (y - ay) * dy) / l2;
+      t = clamp(t, 0, 1);
+      const cx = x - (ax + t * dx), cy = y - (ay + t * dy);
+      if (cx * cx + cy * cy <= r * r) return true;
+    }
+    return false;
+  },
+
+  // borracha vetorial: remove o traço inteiro que encostar no círculo
+  erase(x, y) {
+    const s = this.song();
+    if (!s || !s.strokes.length) return;
+    const keep = s.strokes.filter(st => !this.hit(st, x, y, ERASER));
+    if (keep.length === s.strokes.length) return;
+    s.strokes = keep;
+    this.erased = true;
+    this.dirty();
+  },
+
+  cursor(x, y) {
+    const c = this.lctx;
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = 'rgba(232,86,74,.16)';
+    c.strokeStyle = 'rgba(232,86,74,.75)';
+    c.lineWidth = 2;
+    c.beginPath(); c.arc(x, y, ERASER, 0, 6.2832); c.fill(); c.stroke();
+  },
+
+  dirty() {
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => { this._raf = 0; this.rebuild(); });
+  },
+
+  paint(ctx, strokes) {
+    for (const st of strokes) {
+      const p = st.p;
+      ctx.strokeStyle = st.c || '#ffffff';
+      if (p.length === 3) {                        // toque seco: um ponto
+        ctx.fillStyle = st.c || '#ffffff';
+        ctx.beginPath(); ctx.arc(p[0], p[1], Math.max(1, p[2] / 2), 0, 6.2832); ctx.fill();
+        continue;
+      }
+      for (let i = 0; i + 5 < p.length; i += 3) {  // um segmento por vez: sem overdraw
+        ctx.lineWidth = p[i + 5];
+        ctx.beginPath();
+        ctx.moveTo(p[i], p[i + 1]);
+        ctx.lineTo(p[i + 3], p[i + 4]);
+        ctx.stroke();
+      }
+    }
+  },
+
+  rebuild() {
+    if (!this.bctx) return;
+    this.bctx.clearRect(0, 0, W, H);
+    const s = this.song();
+    if (!s) return;
+    const img = this.legacyImg(s);
+    if (img) this.bctx.drawImage(img, 0, 0, W, H);
+    this.paint(this.bctx, s.strokes);
+  },
+
+  // A STRING do PNG antigo (song.legacy) é persistida junto com a música — tem que ser,
+  // ou a anotação some no reload. O que fica fora de this.data é o objeto Image decodificado:
+  // guardá-lo na música faria o JSON.stringify gravar um "{}" inútil e quebrar o redesenho.
+  legacyImg(s) {
+    if (!s.legacy) return null;
+    let img = this.legacyCache.get(s.id);
+    if (!img) {
+      img = new Image();
+      img.onload = () => { if (this.cur.songId === s.id) this.rebuild(); };
+      img.onerror = () => this.legacyCache.delete(s.id);
+      this.legacyCache.set(s.id, img);
+      img.src = s.legacy;
+    }
+    return img.complete && img.naturalWidth ? img : null;
+  },
+
+  askClear() {
+    if (!this.song()) return;
+    this.ask('Apagar tudo o que está nesta folha?', () => {
+      const s = this.song();
+      if (!s) return;
+      this.snapshot();
+      s.strokes = [];
+      s.legacy = null;
+      this.rebuild();
+      this.dot(false);
+      this.saveNow();
+    });
+  },
+
+  setTool(t) {
+    this.tool = t === 'erase' ? 'erase' : 'pen';
+    $('t-pen').classList.toggle('on', this.tool === 'pen');
+    $('t-erase').classList.toggle('on', this.tool === 'erase');
+  },
+  paintInks() {
+    $('swatches').innerHTML = INKS.map(([c, n]) =>
+      `<button class="swatch" data-c="${c}" style="background:${c}" title="${n}" onclick="app.setInk('${c}')"></button>`).join('');
+    this.setInk(this.ink);
+  },
+  setInk(c) {
+    this.ink = c; this.ui.ink = c; this.saveUi();
+    for (const b of document.querySelectorAll('.swatch')) b.classList.toggle('on', b.dataset.c === c);
+    this.setTool('pen');
+  },
+  toggleStaff() {
+    this.ui.staff = !this.ui.staff;
+    $('staff').classList.toggle('hide', !this.ui.staff);
+    $('t-staff').classList.toggle('on', this.ui.staff);
+    this.saveUi();
+  },
+  toggleFinger() {
+    this.ui.finger = !this.ui.finger;
+    this.live.classList.toggle('finger', this.ui.finger);
+    $('t-finger').classList.toggle('on', this.ui.finger);
+    this.toast(this.ui.finger ? 'O dedo desenha.' : 'O dedo rola a folha; escreva com a caneta.');
+    this.saveUi();
+  },
+
+  /* ---------- arrastar para reordenar ---------- */
+  sortable() {
+    if (this._unsort) { this._unsort(); this._unsort = null; }
+    if (this.cur.setId === ALL) return;
+    const box = $('show-list');
+    let el = null, ph = null, pid = null, y0 = 0, moved = false;
+
+    const down = e => {
+      if (!e.isPrimary || !e.target.closest) return;
+      const g = e.target.closest('.grip');
+      if (!g) return;
+      el = g.closest('.song');
+      if (!el) return;
+      pid = e.pointerId; y0 = e.clientY; moved = false;
+      try { el.setPointerCapture(pid); } catch (err) { }
+      e.preventDefault();
+    };
+    const move = e => {
+      if (!el || e.pointerId !== pid) return;
+      if (!moved) {
+        if (Math.abs(e.clientY - y0) < 6) return;
+        moved = true;
+        ph = document.createElement('div');
+        ph.className = 'song ghost';
+        ph.style.height = el.offsetHeight + 'px';
+        box.insertBefore(ph, el);
+        el.classList.add('dragging');
+      }
+      const r = box.getBoundingClientRect();
+      const top = e.clientY - r.top + box.scrollTop - el.offsetHeight / 2;
+      el.style.top = clamp(top, 0, Math.max(0, box.scrollHeight - el.offsetHeight)) + 'px';
+      let before = null;
+      for (const c of box.children) {
+        if (c === el || c === ph) continue;
+        const q = c.getBoundingClientRect();
+        if (e.clientY < q.top + q.height / 2) { before = c; break; }
+      }
+      before ? box.insertBefore(ph, before) : box.appendChild(ph);
+    };
+    const up = e => {
+      if (!el || e.pointerId !== pid) return;
+      if (moved) {
+        el.classList.remove('dragging');
+        el.style.top = '';
+        if (ph) { box.insertBefore(el, ph); ph.remove(); }
+        const st = this.set(this.cur.setId);
+        if (st) {
+          st.songIds = Array.from(box.children).map(c => c.dataset.id).filter(Boolean);
+          this.saveNow();
+        }
+        // o pointerup vira click na linha; engole esse único click para não trocar de música
+        box.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+        this.drawShowList();
+      }
+      el = null; ph = null; pid = null; moved = false;
+    };
+
+    box.addEventListener('pointerdown', down);
+    box.addEventListener('pointermove', move);
+    box.addEventListener('pointerup', up);
+    box.addEventListener('pointercancel', up);
+    this._unsort = () => {
+      box.removeEventListener('pointerdown', down);
+      box.removeEventListener('pointermove', move);
+      box.removeEventListener('pointerup', up);
+      box.removeEventListener('pointercancel', up);
+    };
+  },
+
+  /* ---------- backup ---------- */
+  download(obj, name) {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(obj)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+
+  exportAll() {
+    this.flush();
+    this.download({ kind: 'backup', v: 3, songs: this.data.songs, sets: this.data.sets }, 'setlist_backup.json');
+    this.toast('Backup baixado.');
+  },
+
+  exportSet(id) {
+    const st = this.set(id);
+    if (!st) return;
+    const songs = st.songIds.map(i => this.byId(i)).filter(Boolean);
+    const slug = st.name.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_').toLowerCase() || 'repertorio';
+    this.download({ kind: 'setlist', v: 3, set: st, songs }, 'repertorio_' + slug + '.json');
+    this.toast('Repertório exportado.');
+  },
+
+  importFile(input) {
+    const f = input.files && input.files[0];
+    input.value = '';
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      let p = null;
+      try { p = JSON.parse(rd.result); } catch (e) { }
+      if (!p || typeof p !== 'object') { this.toast('Esse arquivo não é um backup do Setlist.'); return; }
+      if (p.set && Array.isArray(p.songs)) { this.mergeSet(p); return; }
+      if (Array.isArray(p.songs) && (Array.isArray(p.sets) || Array.isArray(p.setlists))) {
+        this.ask('Substituir tudo o que está aqui pelo conteúdo do backup?', () => {
+          this.legacyCache.clear();
+          this.blank();
+          this.data = {
+            songs: p.songs.map(normSong).filter(s => s.title || s.band),
+            sets: (p.sets || p.setlists).map(normSet)
+          };
+          const live = new Set(this.data.songs.map(s => s.id));
+          for (const st of this.data.sets) st.songIds = st.songIds.filter(i => live.has(i));
+          this.saveNow();
+          this.go('songs');
+          this.toast('Backup restaurado.');
+        });
+        return;
+      }
+      this.toast('Esse arquivo não é um backup do Setlist.');
+    };
+    rd.readAsText(f);
+  },
+
+  // junta um repertório exportado sem apagar nada: músicas que já existem são reaproveitadas
+  // (com as SUAS anotações, não as do arquivo)
+  mergeSet(p) {
+    const index = new Map(this.data.songs.map(s => [key(s.band, s.title), s.id]));
+    const oldToNew = new Map();
+    let added = 0;
+    for (const raw of p.songs) {
+      const s = normSong(raw);
+      if (!s.title && !s.band) continue;
+      const k = key(s.band, s.title);
+      if (index.has(k)) { oldToNew.set(raw.id, index.get(k)); continue; }
+      s.id = uuid('s');
+      this.data.songs.push(s);
+      index.set(k, s.id);
+      oldToNew.set(raw.id, s.id);
+      added++;
+    }
+    const order = Array.isArray(p.set.songIds) ? p.set.songIds : [];
+    let ids = order.map(o => oldToNew.get(o)).filter(Boolean);
+    if (!ids.length) ids = Array.from(new Set(oldToNew.values()));
+    this.data.sets.push(normSet({ name: this.freeName(p.set.name), band: p.set.band, songIds: ids }));
+    this.saveNow();
+    this.go('sets');
+    this.toast('Repertório importado' + (added ? ' · ' + added + ' músicas novas' : ' · nenhuma música nova'));
+  },
+
+  /* ---------- teclado / pedal ---------- */
+  bindKeys() {
+    addEventListener('keydown', e => {
+      if (e.key === 'Escape') { for (const id of ['m-send', 'm-song', 'm-ask']) $(id).classList.add('hide'); return; }
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (document.querySelector('.veil:not(.hide)')) return;
+      if (this.cur.view !== 'show') return;
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.undo(); return; }
+      if (['PageDown', 'ArrowDown', 'ArrowRight', ' '].indexOf(e.key) >= 0) { e.preventDefault(); this.step(1); }
+      else if (['PageUp', 'ArrowUp', 'ArrowLeft'].indexOf(e.key) >= 0) { e.preventDefault(); this.step(-1); }
+    });
+  },
+
+  /* ---------- avisos ---------- */
+  toast(m) {
+    const t = $('toast');
+    t.textContent = m;
+    t.classList.add('on');
+    clearTimeout(this._toast);
+    this._toast = setTimeout(() => t.classList.remove('on'), 2800);
+  },
+  ask(m, fn) {
+    $('ask-text').textContent = m;
+    $('ask-ok').onclick = () => { this.close('m-ask'); fn(); };
+    $('m-ask').classList.remove('hide');
+  },
+  close(id) { $(id).classList.add('hide'); }
+};
+
+window.app = app;   // usado pelos onclick do HTML
+
+if (document.readyState === 'loading') addEventListener('DOMContentLoaded', () => app.init());
+else app.init();
+
+</script>
+</body>
+</html>
