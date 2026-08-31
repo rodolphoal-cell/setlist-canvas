@@ -203,6 +203,7 @@ textarea.field{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Con
 <symbol id="s-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></symbol>
 <symbol id="s-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1L19.5 7.5a2.1 2.1 0 0 0-3-3L5 16z"/><path d="M14 6l3 3"/></symbol>
 <symbol id="s-erase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 20H9l-6-6 9-9 9 9-6 6"/><path d="M13 8l3 3"/></symbol>
+<symbol id="s-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
 <symbol id="s-redo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 9H10a4 4 0 0 0 0 8h6M16 5l4 4-4 4"/></symbol>
 <symbol id="s-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h10a4 4 0 0 1 0 8h-6M8 5L4 9l4 4"/></symbol>
 <symbol id="s-grip" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></symbol>
@@ -352,6 +353,7 @@ textarea.field{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Con
         <button class="tool" onclick="app.askClear()" title="Apagar a página inteira"><svg class="icon"><use href="#s-trash"/></svg></button>
         <button class="tool" id="t-staff" onclick="app.toggleStaff()" title="Pauta"><svg class="icon"><use href="#s-staff"/></svg></button>
         <button class="tool" id="t-finger" onclick="app.toggleFinger()" title="Desenhar com o dedo"><svg class="icon"><use href="#s-hand"/></svg></button>
+        <button class="tool" id="t-full" onclick="app.toggleFull()" title="Tela cheia"><svg class="icon"><use href="#s-full"/></svg></button>
         <span class="sep"></span>
         <div class="zoom">
           <button onclick="app.zoomBy(-1)" title="Diminuir">−</button>
@@ -513,7 +515,7 @@ const app = {
 
   base: null, bctx: null, live: null, lctx: null,
   tool: 'pen', ink: '#ffffff', zoom: 1, fitW: 600,
-  ptr: null, pan: null, stroke: null, wasErase: false, erased: false,
+  ptr: null, touches: new Map(), gest: null, stroke: null, wasErase: false, erased: false,
   undos: [], redos: [], legacyCache: new Map(),
   wakeRef: null, bytes: 0, warned: false, storageOk: true,
   _save: 0, _raf: 0, _toast: 0, _unsort: null,
@@ -937,11 +939,19 @@ const app = {
     this.go(this.cur.setId === ALL ? 'songs' : 'sets');
   },
 
-  stageMode() {
+  stageMode() { this.wake(); },
+
+  // tela cheia é opcional; a trava de retrato só funciona dentro dela
+  toggleFull() {
+    if (document.fullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => { });
+      return;
+    }
     const el = document.documentElement;
-    if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => { });
-    try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => { }); } catch (e) { }
-    this.wake();
+    if (!el.requestFullscreen) { this.toast('Este navegador não oferece tela cheia.'); return; }
+    el.requestFullscreen().then(() => {
+      try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => { }); } catch (e) { }
+    }).catch(() => { });
   },
   wake() {
     if (!navigator.wakeLock || this.wakeRef) return;
@@ -1081,6 +1091,8 @@ const app = {
     for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) this.live.addEventListener(t, e => this.up(e));
 
 
+    document.addEventListener('fullscreenchange', () =>
+      $('t-full').classList.toggle('on', !!document.fullscreenElement));
     this.buildStaff();
     this.initSplit();
     if (window.ResizeObserver) new ResizeObserver(() => this.layout()).observe($('desk'));
@@ -1185,14 +1197,14 @@ const app = {
     // Dedo rola a folha. Como touch-action é none, quem rola somos nós.
     // Com a caneta no papel isso não vale: é a palma da mão apoiada.
     if (e.pointerType === 'touch' && !this.finger) {
-      if (this.ptr !== null || this.pan) return;
-      const b = $('deskbody');
-      this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY, sl: b.scrollLeft, st: b.scrollTop };
+      if (this.ptr !== null) return;
+      this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       try { this.live.setPointerCapture(e.pointerId); } catch (err) { }
+      this.anchor();
       return;
     }
 
-    this.pan = null;                                          // caneta tem prioridade sobre o dedo
+    this.touches.clear(); this.gest = null;                   // caneta tem prioridade sobre o dedo
     if (this.ptr !== null) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
@@ -1207,12 +1219,7 @@ const app = {
   },
 
   move(e) {
-    if (this.pan && e.pointerId === this.pan.id) {
-      const b = $('deskbody');
-      b.scrollLeft = this.pan.sl - (e.clientX - this.pan.x);
-      b.scrollTop = this.pan.st - (e.clientY - this.pan.y);
-      return;
-    }
+    if (this.dragTouch(e)) return;
     if (e.pointerId !== this.ptr) return;
     e.preventDefault();
     // alguns navegadores devolvem lista vazia; aí vale o próprio evento
@@ -1244,9 +1251,10 @@ const app = {
   },
 
   up(e) {
-    if (this.pan && e.pointerId === this.pan.id) {
-      this.pan = null;
+    if (this.touches.has(e.pointerId)) {
+      this.touches.delete(e.pointerId);
       try { this.live.releasePointerCapture(e.pointerId); } catch (err) { }
+      this.anchor();
       return;
     }
     if (e.pointerId !== this.ptr) return;
@@ -1255,6 +1263,50 @@ const app = {
     if (this.wasErase && !this.erased) this.undos.pop();   // gesto que não apagou nada não vira undo
     this.bake();
     this.save();
+  },
+
+  // Refaz a âncora do gesto sempre que um dedo entra ou sai, para não dar salto
+  // ao passar de um para dois dedos.
+  anchor() {
+    const p = Array.from(this.touches.values());
+    if (!p.length) { this.gest = null; return; }
+    const dois = p.length > 1;
+    const mx = dois ? (p[0].x + p[1].x) / 2 : p[0].x;
+    const my = dois ? (p[0].y + p[1].y) / 2 : p[0].y;
+    const r = $('sheet').getBoundingClientRect();
+    const b = $('deskbody');
+    this.gest = {
+      d0: dois ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0,
+      z0: this.zoom,
+      u: r.width ? (mx - r.left) / r.width : 0.5,
+      v: r.height ? (my - r.top) / r.height : 0.5,
+      mx, my, sl: b.scrollLeft, st: b.scrollTop
+    };
+  },
+
+  // um dedo arrasta a folha; dois dedos dão zoom mantendo o ponto entre eles parado
+  dragTouch(e) {
+    const t = this.touches.get(e.pointerId);
+    if (!t) return false;
+    t.x = e.clientX; t.y = e.clientY;
+    const g = this.gest;
+    if (!g) return true;
+    const p = Array.from(this.touches.values());
+    const b = $('deskbody');
+
+    if (p.length > 1 && g.d0 > 0) {
+      const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      const mx = (p[0].x + p[1].x) / 2, my = (p[0].y + p[1].y) / 2;
+      this.zoom = clamp(+(g.z0 * d / g.d0).toFixed(3), 0.5, 4);
+      this.applyZoom();
+      const r = $('sheet').getBoundingClientRect();
+      b.scrollLeft += (r.left + g.u * r.width) - mx;
+      b.scrollTop += (r.top + g.v * r.height) - my;
+    } else {
+      b.scrollLeft = g.sl - (p[0].x - g.mx);
+      b.scrollTop = g.st - (p[0].y - g.my);
+    }
+    return true;
   },
 
   // fecha o traço atual: entra na lista da música e é pintado na camada base
