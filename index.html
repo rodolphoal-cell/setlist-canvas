@@ -149,8 +149,9 @@ textarea.field{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Con
 .pagehead i{font-style:normal;color:var(--dim);font-size:calc(var(--s,.5)*24px);line-height:1.25}
 .pagehead i:empty{display:none}
 .sheetbox canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-#c-live{touch-action:pan-x pan-y}
-#c-live.finger{touch-action:none}
+/* nunca pan-*: o touch-action vale para a caneta também, e o navegador rouba o gesto
+   no meio do traço. A rolagem com o dedo é feita à mão em down/move. */
+#c-live{touch-action:none}
 .blank{position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);text-align:center;padding:30px;gap:10px}
 
 /* ---------- modais e toast ---------- */
@@ -512,7 +513,7 @@ const app = {
 
   base: null, bctx: null, live: null, lctx: null,
   tool: 'pen', ink: '#ffffff', zoom: 1, fitW: 600,
-  ptr: null, stroke: null, wasErase: false, erased: false,
+  ptr: null, pan: null, stroke: null, wasErase: false, erased: false,
   undos: [], redos: [], legacyCache: new Map(),
   wakeRef: null, bytes: 0, warned: false, storageOk: true,
   _save: 0, _raf: 0, _toast: 0, _unsort: null,
@@ -939,7 +940,7 @@ const app = {
   stageMode() {
     const el = document.documentElement;
     if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => { });
-    try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => { }); } catch (e) { }
+    try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => { }); } catch (e) { }
     this.wake();
   },
   wake() {
@@ -1179,8 +1180,20 @@ const app = {
   eraserR() { return ERASERS[this.ui.eraser] || ERASERS[1]; },
 
   down(e) {
-    if (!this.live || !this.cur.songId || this.ptr !== null) return;
-    if (e.pointerType === 'touch' && !this.finger) return;   // dedo rola a folha; caneta escreve
+    if (!this.live || !this.cur.songId) return;
+
+    // Dedo rola a folha. Como touch-action é none, quem rola somos nós.
+    // Com a caneta no papel isso não vale: é a palma da mão apoiada.
+    if (e.pointerType === 'touch' && !this.finger) {
+      if (this.ptr !== null || this.pan) return;
+      const b = $('deskbody');
+      this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY, sl: b.scrollLeft, st: b.scrollTop };
+      try { this.live.setPointerCapture(e.pointerId); } catch (err) { }
+      return;
+    }
+
+    this.pan = null;                                          // caneta tem prioridade sobre o dedo
+    if (this.ptr !== null) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     this.ptr = e.pointerId;
@@ -1194,9 +1207,17 @@ const app = {
   },
 
   move(e) {
+    if (this.pan && e.pointerId === this.pan.id) {
+      const b = $('deskbody');
+      b.scrollLeft = this.pan.sl - (e.clientX - this.pan.x);
+      b.scrollTop = this.pan.st - (e.clientY - this.pan.y);
+      return;
+    }
     if (e.pointerId !== this.ptr) return;
     e.preventDefault();
-    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    // alguns navegadores devolvem lista vazia; aí vale o próprio evento
+    let evs = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+    if (!evs || !evs.length) evs = [e];
 
     if (this.wasErase) {
       for (const q of evs) { const p = this.pt(q); this.erase(p.x, p.y); }
@@ -1223,6 +1244,11 @@ const app = {
   },
 
   up(e) {
+    if (this.pan && e.pointerId === this.pan.id) {
+      this.pan = null;
+      try { this.live.releasePointerCapture(e.pointerId); } catch (err) { }
+      return;
+    }
     if (e.pointerId !== this.ptr) return;
     this.ptr = null;
     try { this.live.releasePointerCapture(e.pointerId); } catch (err) { }
