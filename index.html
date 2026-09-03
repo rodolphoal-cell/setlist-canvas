@@ -395,8 +395,10 @@ textarea.field{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Con
   <h3>Sincronizar entre aparelhos</h3>
 
   <div id="cl-setup" class="hide" style="display:flex;flex-direction:column;gap:12px">
-    <p class="sub">Cole aqui o bloco <span class="mono">firebaseConfig</span> do seu projeto no console do Firebase. Ele fica em Configurações do projeto → Seus apps → Web. Precisa ter <span class="mono">databaseURL</span>, ou seja, o Realtime Database criado.</p>
-    <textarea class="field" id="cl-cfg" rows="5" placeholder='const firebaseConfig = {&#10;  apiKey: "AIza…",&#10;  databaseURL: "https://seu-projeto-default-rtdb.firebaseio.com",&#10;  …&#10;};'></textarea>
+    <div id="cl-cfgbox" style="display:flex;flex-direction:column;gap:12px">
+      <p class="sub">Cole aqui o bloco <span class="mono">firebaseConfig</span> do seu projeto no console do Firebase. Ele fica em Configurações do projeto → Seus apps → Web. Precisa ter <span class="mono">databaseURL</span>, ou seja, o Realtime Database criado.</p>
+      <textarea class="field" id="cl-cfg" rows="5" placeholder='const firebaseConfig = {&#10;  apiKey: "AIza…",&#10;  databaseURL: "https://seu-projeto-default-rtdb.firebaseio.com",&#10;  …&#10;};'></textarea>
+    </div>
     <input class="field" id="cl-mail" type="email" autocomplete="username" placeholder="E-mail">
     <input class="field" id="cl-pass" type="password" autocomplete="current-password" placeholder="Senha (mínimo 6 caracteres)">
     <div class="end">
@@ -444,6 +446,23 @@ textarea.field{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Con
 
 <script>
 "use strict";
+
+/* ════════════════════════════════════════════════════════════════════
+   CONFIGURAÇÃO DO FIREBASE  —  opcional, edite só estas duas linhas
+
+   Preenchendo aqui, todo aparelho que abrir esta página já vem apontado
+   para o seu projeto: na tela Nuvem sobra só e-mail e senha.
+   Deixando em branco, o app pede a configuração colada, uma vez por
+   aparelho. Os dois valores saem do bloco firebaseConfig do console.
+
+   Estes dados são públicos por natureza (é assim que o Firebase para web
+   funciona). Quem protege o acervo são as regras do banco e a sua senha.
+   ════════════════════════════════════════════════════════════════════ */
+const FIREBASE = {
+  apiKey: "AIzaSyDZMdMVFAzS2N87T86kVfaTKrj8RpSKUHc",
+  databaseURL: "https://setlist-canvas-default-rtdb.firebaseio.com",
+};
+/* ══════════════════════════════════════════════════════════════════ */
 
 /* ============ util ============ */
 const $ = id => document.getElementById(id);
@@ -1749,8 +1768,15 @@ const app = {
       for (const k of ['apiKey', 'db', 'uid', 'refresh', 'email']) if (typeof c[k] === 'string') this.cloud[k] = c[k];
       if (c.acked && typeof c.acked === 'object') this.cloud.acked = c.acked;
       if (typeof c.last === 'number') this.cloud.last = c.last;
+      if (typeof c.marca === 'number') this.cloud.marca = c.marca;
     } catch (e) { }
+    // o que estiver fixo no arquivo manda: trocar de projeto ali vale para todos
+    if (FIREBASE.apiKey && FIREBASE.databaseURL) {
+      this.cloud.apiKey = String(FIREBASE.apiKey).trim();
+      this.cloud.db = String(FIREBASE.databaseURL).trim().replace(/\/+$/, '');
+    }
   },
+  cloudFixo() { return !!(FIREBASE.apiKey && FIREBASE.databaseURL); },
   saveCloud() { LS.set(CLOUD_KEY, JSON.stringify(this.cloud)); },
   cloudOn() { return !!(this.cloud.apiKey && this.cloud.db && this.cloud.refresh); },
 
@@ -1964,8 +1990,8 @@ const app = {
     $('cl-cfg').value = '';
     $('cl-mail').value = this.cloud.email || '';
     $('cl-pass').value = '';
+    $('m-cloud').classList.remove('hide');   // antes de pintar: paintCloud ignora modal escondido
     this.paintCloud();
-    $('m-cloud').classList.remove('hide');
   },
 
   paintCloud() {
@@ -1979,6 +2005,7 @@ const app = {
     if (!box || box.classList.contains('hide')) return;
     $('cl-setup').classList.toggle('hide', ligado);
     $('cl-live').classList.toggle('hide', !ligado);
+    $('cl-cfgbox').classList.toggle('hide', this.cloudFixo());   // já veio no arquivo
     if (ligado) {
       $('cl-who').textContent = this.cloud.email || '—';
       $('cl-when').textContent = this.syncing ? 'sincronizando…'
@@ -1999,6 +2026,7 @@ const app = {
       this.cloud.db = String(d[1]).replace(/\/+$/, '');
     }
     if (!this.cloud.apiKey || !this.cloud.db) { this.toast('Cole a configuração do seu projeto Firebase.'); return; }
+    this.saveCloud();
 
     const mail = $('cl-mail').value.trim(), pass = $('cl-pass').value;
     if (!mail || !pass) { this.toast('Informe e-mail e senha.'); return; }
