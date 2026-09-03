@@ -52,6 +52,8 @@ button{cursor:pointer}
 .btn.quiet:hover{color:var(--txt);background:var(--panel2)}
 .btn.sm{padding:5px 10px;font-size:13px}
 .btn.danger:hover{color:var(--red);border-color:#5c2a26}
+.btn.on{border-color:var(--amber);color:var(--amber)}
+.btn.bad{border-color:#5c2a26;color:var(--red)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 
 /* ---------- containers ---------- */
@@ -203,6 +205,7 @@ textarea.field{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Con
 <symbol id="s-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></symbol>
 <symbol id="s-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1L19.5 7.5a2.1 2.1 0 0 0-3-3L5 16z"/><path d="M14 6l3 3"/></symbol>
 <symbol id="s-erase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 20H9l-6-6 9-9 9 9-6 6"/><path d="M13 8l3 3"/></symbol>
+<symbol id="s-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 19a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 10.5a4.25 4.25 0 0 1-.5 8.5z"/></symbol>
 <symbol id="s-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
 <symbol id="s-redo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 9H10a4 4 0 0 0 0 8h6M16 5l4 4-4 4"/></symbol>
 <symbol id="s-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h10a4 4 0 0 1 0 8h-6M8 5L4 9l4 4"/></symbol>
@@ -252,6 +255,7 @@ textarea.field{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Con
           <option value="band">Artista (A–Z)</option>
           <option value="added">Ordem de inclusão</option>
         </select>
+        <button class="btn" id="btn-cloud" onclick="app.openCloud()"><svg class="icon"><use href="#s-cloud"/></svg>Nuvem</button>
         <button class="btn" onclick="app.exportAll()"><svg class="icon"><use href="#s-out"/></svg>Backup</button>
         <button class="btn" onclick="document.getElementById('file-in').click()"><svg class="icon"><use href="#s-in"/></svg>Importar</button>
         <input type="file" id="file-in" accept=".json,application/json" class="hide" onchange="app.importFile(this)">
@@ -386,6 +390,36 @@ textarea.field{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Con
   <div class="end"><button class="btn" onclick="app.close('m-send')">Fechar</button></div>
 </div></div>
 
+<!-- modal: nuvem -->
+<div class="veil hide" id="m-cloud"><div class="modal" style="max-width:520px">
+  <h3>Sincronizar entre aparelhos</h3>
+
+  <div id="cl-setup" class="hide" style="display:flex;flex-direction:column;gap:12px">
+    <p class="sub">Cole aqui o bloco <span class="mono">firebaseConfig</span> do seu projeto no console do Firebase. Ele fica em Configurações do projeto → Seus apps → Web. Precisa ter <span class="mono">databaseURL</span>, ou seja, o Realtime Database criado.</p>
+    <textarea class="field" id="cl-cfg" rows="5" placeholder='const firebaseConfig = {&#10;  apiKey: "AIza…",&#10;  databaseURL: "https://seu-projeto-default-rtdb.firebaseio.com",&#10;  …&#10;};'></textarea>
+    <input class="field" id="cl-mail" type="email" autocomplete="username" placeholder="E-mail">
+    <input class="field" id="cl-pass" type="password" autocomplete="current-password" placeholder="Senha (mínimo 6 caracteres)">
+    <div class="end">
+      <button class="btn" onclick="app.close('m-cloud')">Cancelar</button>
+      <button class="btn" onclick="app.connect(true)">Criar conta</button>
+      <button class="btn primary" onclick="app.connect(false)">Entrar</button>
+    </div>
+  </div>
+
+  <div id="cl-live" class="hide" style="display:flex;flex-direction:column;gap:12px">
+    <div>
+      <div class="tt" id="cl-who">—</div>
+      <div class="sub mono" id="cl-when">—</div>
+    </div>
+    <p class="sub">Cada música e cada repertório sincronizam separados. Se o mesmo item for editado em dois aparelhos, vale a edição mais recente. O aparelho continua funcionando sem internet — a sincronização acontece quando ela volta.</p>
+    <div class="end">
+      <button class="btn danger" onclick="app.signOut()">Desconectar</button>
+      <button class="btn" onclick="app.close('m-cloud')">Fechar</button>
+      <button class="btn primary" onclick="app.sync(true)">Sincronizar agora</button>
+    </div>
+  </div>
+</div></div>
+
 <!-- modal: editar música -->
 <div class="veil hide" id="m-song"><div class="modal">
   <h3>Editar música</h3>
@@ -441,6 +475,34 @@ const LS = {
   }
 };
 
+const CLOUD_KEY = 'setlistCloud';
+const IDP = 'https://identitytoolkit.googleapis.com/v1/accounts:';
+const TOKEN_URL = 'https://securetoken.googleapis.com/v1/token?key=';
+
+// Traços e listas de ids viajam como texto JSON: o Realtime Database transforma
+// arrays em objetos indexados, e assim o payload também fica bem menor.
+const songSig = s => JSON.stringify([s.band, s.title, s.staff, s.tom, s.bpm, s.dur, s.legacy, s.strokes]);
+const setSig = t => JSON.stringify([t.name, t.band, t.songIds]);
+const songOut = s => ({
+  band: s.band, title: s.title, tom: s.tom, bpm: s.bpm, dur: s.dur,
+  staff: !!s.staff, strokes: JSON.stringify(s.strokes), legacy: s.legacy || null, up: s.up || 0
+});
+const setOut = t => ({ name: t.name, band: t.band, ids: JSON.stringify(t.songIds), up: t.up || 0 });
+function jparse(v, def) { try { const x = JSON.parse(v); return x == null ? def : x; } catch (e) { return def; } }
+const songIn = (id, r) => normSong({
+  id, band: r.band, title: r.title, tom: r.tom, bpm: r.bpm, dur: r.dur,
+  staff: r.staff, strokes: jparse(r.strokes, []), legacy: r.legacy, up: r.up
+});
+const setIn = (id, r) => normSet({ id, name: r.name, band: r.band, songIds: jparse(r.ids, []), up: r.up });
+
+function quando(ts) {
+  const m = Math.round((Date.now() - ts) / 60000);
+  if (m < 1) return 'agora';
+  if (m < 60) return 'há ' + m + ' min';
+  const h = Math.round(m / 60);
+  return h < 24 ? 'há ' + h + ' h' : 'há ' + Math.round(h / 24) + ' dias';
+}
+
 function uuid(p) {
   const r = (typeof crypto !== 'undefined' && crypto.randomUUID)
     ? crypto.randomUUID().replace(/-/g, '')
@@ -479,6 +541,7 @@ function normSong(raw) {
     tom: String(s.tom || '').trim(),
     bpm: String(s.bpm || '').trim(),
     dur: Number(s.dur != null ? s.dur : s.duration) || 0,
+    up: Number(s.up) || 0,
     strokes: [],
     legacy: s.legacy || s.drawingData || null   // anotação antiga em PNG vira fundo da folha
   };
@@ -501,6 +564,7 @@ function normSet(raw) {
     id: t.id || uuid('r'),
     name: String(t.name || 'Sem nome').trim() || 'Sem nome',
     band: String(t.band || '').trim(),
+    up: Number(t.up) || 0,
     songIds: Array.isArray(t.songIds) ? t.songIds.slice() : []
   };
 }
@@ -517,6 +581,8 @@ const app = {
   tool: 'pen', ink: '#ffffff', zoom: 1, fitW: 600,
   ptr: null, touches: new Map(), gest: null, stroke: null, wasErase: false, erased: false,
   undos: [], redos: [], legacyCache: new Map(),
+  cloud: { apiKey: '', db: '', uid: '', refresh: '', email: '', acked: {}, last: 0, marca: 0 },
+  tok: '', tokExp: 0, syncing: false, sigs: new Map(), cloudMsg: '',
   wakeRef: null, bytes: 0, warned: false, storageOk: true,
   _save: 0, _raf: 0, _toast: 0, _unsort: null,
 
@@ -527,7 +593,9 @@ const app = {
     if (this.storageOk) { try { localStorage.removeItem('__probe'); } catch (e) { } }
     else { this.warned = true; setTimeout(() => this.toast(SEM_STORAGE), 500); }
     this.loadUi();
+    this.loadCloud();
     this.load();
+    this.stamp();
     this.initCanvas();
     this.paintInks();
     this.paintSizes();
@@ -538,9 +606,11 @@ const app = {
     addEventListener('beforeunload', () => this.flush());
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') { this.flush(); this.dropWake(); }
-      else if (this.cur.view === 'show') this.wake();
+      else { if (this.cur.view === 'show') this.wake(); if (this.cloudOn()) this.sync(); }
     });
+    this.paintCloud();
     this.go('songs');
+    if (this.cloudOn()) this.sync();
   },
 
   /* ---------- dados ---------- */
@@ -567,7 +637,8 @@ const app = {
     const sets = d && Array.isArray(d.sets) ? d.sets : (d && Array.isArray(d.setlists) ? d.setlists : []);
     this.data = {
       songs: songs.map(normSong).filter(s => s.title || s.band),
-      sets: sets.map(normSet)
+      sets: sets.map(normSet),
+      dead: (d && d.dead && typeof d.dead === 'object') ? d.dead : {}   // apagados, para não ressuscitarem
     };
     const live = new Set(this.data.songs.map(s => s.id));
     for (const st of this.data.sets) st.songIds = st.songIds.filter(i => live.has(i));
@@ -580,6 +651,7 @@ const app = {
 
   saveNow() {
     clearTimeout(this._save);
+    this.stamp();
     const json = JSON.stringify(this.data);
     this.bytes = json.length;
     const r = LS.set(KEY, json);
@@ -589,6 +661,10 @@ const app = {
       this.toast(r === 'cheio' ? 'Armazenamento cheio. Faça um backup e apague anotações antigas.' : SEM_STORAGE);
     }
     if (this.cur.view === 'songs') this.paintUsage();
+    if (this.cloudOn() && !this.syncing) {
+      clearTimeout(this._sync);
+      this._sync = setTimeout(() => this.sync(), 3000);
+    }
   },
 
   flush() { this.bake(); if (this._save) this.saveNow(); },
@@ -694,6 +770,7 @@ const app = {
     this.ask('Excluir "' + s.title + '"? Sai de todos os repertórios e as anotações vão junto.', () => {
       this.data.songs = this.data.songs.filter(x => x.id !== id);
       for (const st of this.data.sets) st.songIds = st.songIds.filter(i => i !== id);
+      this.data.dead['s' + id] = Date.now();
       this.legacyCache.delete(id);
       if (this.cur.songId === id) this.blank();
       this.saveNow();
@@ -786,6 +863,7 @@ const app = {
     if (!st) return;
     this.ask('Excluir o repertório "' + st.name + '"? As músicas continuam no acervo.', () => {
       this.data.sets = this.data.sets.filter(x => x.id !== id);
+      this.data.dead['t' + id] = Date.now();
       this.saveNow();
       this.drawSets();
     });
@@ -1598,9 +1676,15 @@ const app = {
         this.ask('Substituir tudo o que está aqui pelo conteúdo do backup?', () => {
           this.legacyCache.clear();
           this.blank();
+          const agora = Date.now();
+          const cova = Object.assign({}, this.data.dead);
+          for (const x of this.data.songs) cova['s' + x.id] = agora;
+          for (const x of this.data.sets) cova['t' + x.id] = agora;
+          this.sigs.clear();
           this.data = {
             songs: p.songs.map(normSong).filter(s => s.title || s.band),
-            sets: (p.sets || p.setlists).map(normSet)
+            sets: (p.sets || p.setlists).map(normSet),
+            dead: cova
           };
           const live = new Set(this.data.songs.map(s => s.id));
           for (const st of this.data.sets) st.songIds = st.songIds.filter(i => live.has(i));
@@ -1656,6 +1740,283 @@ const app = {
       else if (['PageUp', 'ArrowUp', 'ArrowLeft'].indexOf(e.key) >= 0) { e.preventDefault(); this.step(-1); }
     });
   },
+
+  /* ---------- nuvem: Firebase Realtime Database por REST ---------- */
+
+  loadCloud() {
+    try {
+      const c = JSON.parse(LS.get(CLOUD_KEY) || '{}');
+      for (const k of ['apiKey', 'db', 'uid', 'refresh', 'email']) if (typeof c[k] === 'string') this.cloud[k] = c[k];
+      if (c.acked && typeof c.acked === 'object') this.cloud.acked = c.acked;
+      if (typeof c.last === 'number') this.cloud.last = c.last;
+    } catch (e) { }
+  },
+  saveCloud() { LS.set(CLOUD_KEY, JSON.stringify(this.cloud)); },
+  cloudOn() { return !!(this.cloud.apiKey && this.cloud.db && this.cloud.refresh); },
+
+  // troca o refresh token por um id token válido; ele dura 1 hora
+  async idToken() {
+    if (this.tok && this.tokExp > Date.now() + 60000) return this.tok;
+    const r = await fetch(TOKEN_URL + encodeURIComponent(this.cloud.apiKey), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(this.cloud.refresh)
+    });
+    const j = await r.json();
+    if (!r.ok || !j.id_token) throw new Error('sessão expirada');
+    this.tok = j.id_token;
+    this.tokExp = Date.now() + (Number(j.expires_in) || 3600) * 1000;
+    if (j.refresh_token) { this.cloud.refresh = j.refresh_token; this.saveCloud(); }
+    return this.tok;
+  },
+
+  async dbCall(path, method, body, query) {
+    const t = await this.idToken();
+    let url = this.cloud.db + '/u/' + this.cloud.uid + path + '.json?auth=' + encodeURIComponent(t);
+    if (query) url += '&' + query;
+    const r = await fetch(url, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if (!r.ok) throw new Error('banco recusou (' + r.status + ')');
+    return r.json();
+  },
+
+  async signIn(email, pass, novo) {
+    const url = IDP + (novo ? 'signUp' : 'signInWithPassword') + '?key=' + encodeURIComponent(this.cloud.apiKey);
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass, returnSecureToken: true })
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      const m = (j.error && j.error.message) || 'falhou';
+      throw new Error({
+        EMAIL_EXISTS: 'Esse e-mail já tem conta — entre em vez de criar.',
+        EMAIL_NOT_FOUND: 'E-mail não cadastrado.',
+        INVALID_PASSWORD: 'Senha incorreta.',
+        INVALID_LOGIN_CREDENTIALS: 'E-mail ou senha incorretos.',
+        WEAK_PASSWORD: 'A senha precisa de pelo menos 6 caracteres.'
+      }[m.split(' :')[0]] || m);
+    }
+    this.cloud.uid = j.localId;
+    this.cloud.refresh = j.refreshToken;
+    this.cloud.email = email;
+    this.tok = j.idToken;
+    this.tokExp = Date.now() + (Number(j.expiresIn) || 3600) * 1000;
+    this.saveCloud();
+  },
+
+  signOut() {
+    this.cloud.uid = '';
+    this.cloud.refresh = '';
+    this.cloud.email = '';
+    this.cloud.acked = {};
+    this.cloud.last = 0;
+    this.tok = '';
+    this.tokExp = 0;
+    this.cloudMsg = '';
+    this.saveCloud();
+    this.paintCloud();
+    this.toast('Desconectado. Os dados continuam neste aparelho.');
+  },
+
+  // Detecta o que mudou comparando assinaturas, em vez de marcar cada ponto de edição.
+  // Assim nenhum caminho novo de alteração fica de fora da sincronização por esquecimento.
+  stamp() {
+    if (!this.cloudOn()) return;
+    const now = Date.now();
+    for (const s of this.data.songs) this.bump('s' + s.id, s, songSig(s), now);
+    for (const t of this.data.sets) this.bump('t' + t.id, t, setSig(t), now);
+  },
+  bump(k, o, sig, now) {
+    const antes = this.sigs.get(k);
+    this.sigs.set(k, sig);
+    if (antes === undefined) { if (!o.up) o.up = now; return; }
+    if (antes !== sig) o.up = now;
+  },
+  sync(manual) {
+    if (!this.cloudOn() || this.syncing) return Promise.resolve();
+    this.syncing = true;
+    this.cloudMsg = 'sincronizando…';
+    this.paintCloud();
+    return this.pull()
+      .then(() => this.push())
+      .then(() => {
+        this.cloud.last = Date.now();
+        this.saveCloud();
+        this.cloudMsg = '';
+        if (manual) this.toast('Sincronizado.');
+      })
+      .catch(err => {
+        if (!this.cloudOn()) return;                 // desconectou no meio: não é erro
+        console.error('sync:', err);
+        this.cloudMsg = String(err.message || err);
+        if (manual) this.toast('Não deu para sincronizar: ' + this.cloudMsg);
+      })
+      .then(() => { this.syncing = false; this.paintCloud(); });
+  },
+
+  async pull() {
+    // janela de folga de 5 min: relógios de aparelhos diferentes não batem exatamente
+    const desde = Math.max(0, (this.cloud.marca || 0) - 300000);
+    const q = 'orderBy=%22up%22&startAt=' + desde;
+    const [songs, sets] = await Promise.all([
+      this.dbCall('/songs', 'GET', null, q),
+      this.dbCall('/sets', 'GET', null, q)
+    ]);
+    let alto = desde, mexeu = false;
+
+    for (const id in (songs || {})) {
+      const r = songs[id] || {};
+      alto = Math.max(alto, Number(r.up) || 0);
+      const local = this.byId(id);
+      const up = Number(r.up) || 0;
+      if (local && (local.up || 0) > up) continue;                 // o daqui é mais novo
+      if ((this.data.dead['s' + id] || 0) >= up) continue;         // apagado aqui, não ressuscita
+      if (r.del) {
+        if (local) {
+          this.data.songs = this.data.songs.filter(x => x.id !== id);
+          for (const t of this.data.sets) t.songIds = t.songIds.filter(i => i !== id);
+          this.legacyCache.delete(id);
+          if (this.cur.songId === id) this.blank();
+        }
+        this.data.dead['s' + id] = Number(r.up) || Date.now();
+      } else {
+        const novo = songIn(id, r);
+        if (local) Object.assign(local, novo); else this.data.songs.push(novo);
+        this.sigs.set('s' + id, songSig(novo));
+      }
+      this.cloud.acked[id] = up;
+      mexeu = true;
+    }
+
+    for (const id in (sets || {})) {
+      const r = sets[id] || {};
+      alto = Math.max(alto, Number(r.up) || 0);
+      const local = this.set(id);
+      const up = Number(r.up) || 0;
+      if (local && (local.up || 0) > up) continue;
+      if ((this.data.dead['t' + id] || 0) >= up) continue;
+      if (r.del) {
+        if (local) this.data.sets = this.data.sets.filter(x => x.id !== id);
+        this.data.dead['t' + id] = Number(r.up) || Date.now();
+      } else {
+        const novo = setIn(id, r);
+        if (local) Object.assign(local, novo); else this.data.sets.push(novo);
+        this.sigs.set('t' + id, setSig(novo));
+      }
+      this.cloud.acked[id] = up;
+      mexeu = true;
+    }
+
+    if (mexeu) {
+      const vivos = new Set(this.data.songs.map(s => s.id));
+      for (const t of this.data.sets) t.songIds = t.songIds.filter(i => vivos.has(i));
+      this.cloud.marca = alto;
+      this.saveNow();
+      this.redrawAll();
+    }
+  },
+
+  async push() {
+    this.stamp();
+    const lote = [];
+    for (const s of this.data.songs) {
+      if ((s.up || 0) > (this.cloud.acked[s.id] || 0)) lote.push(['songs/' + s.id, songOut(s), s.id, s.up]);
+    }
+    for (const t of this.data.sets) {
+      if ((t.up || 0) > (this.cloud.acked[t.id] || 0)) lote.push(['sets/' + t.id, setOut(t), t.id, t.up]);
+    }
+    for (const k in this.data.dead) {
+      const id = k.slice(1), up = this.data.dead[k];
+      if (up > (this.cloud.acked[id] || 0)) {
+        lote.push([(k[0] === 's' ? 'songs/' : 'sets/') + id, { del: true, up }, id, up]);
+      }
+    }
+    if (!lote.length) return;
+
+    for (let i = 0; i < lote.length; i += 25) {            // lotes pequenos: uma folha pesada tem dezenas de KB
+      const parte = lote.slice(i, i + 25);
+      const corpo = {};
+      for (const [caminho, dados] of parte) corpo[caminho] = dados;
+      await this.dbCall('', 'PATCH', corpo);
+      for (const [, , id, up] of parte) this.cloud.acked[id] = up;
+      this.saveCloud();
+    }
+  },
+
+  // depois de puxar mudanças de outro aparelho, a tela precisa refletir
+  redrawAll() {
+    if (this.cur.view === 'songs') this.drawSongs();
+    else if (this.cur.view === 'sets') this.drawSets();
+    else if (this.cur.view === 'show') {
+      const s = this.song();
+      this.drawShowList();
+      if (s) { this.rebuild(); this.showStaff(s.staff); this.nowPlaying(s); }
+    }
+  },
+
+  /* ---------- tela da nuvem ---------- */
+  openCloud() {
+    $('cl-cfg').value = '';
+    $('cl-mail').value = this.cloud.email || '';
+    $('cl-pass').value = '';
+    this.paintCloud();
+    $('m-cloud').classList.remove('hide');
+  },
+
+  paintCloud() {
+    const ligado = this.cloudOn();
+    const btn = $('btn-cloud');
+    if (btn) {
+      btn.classList.toggle('on', ligado && !this.cloudMsg);
+      btn.classList.toggle('bad', !!this.cloudMsg && !this.syncing);
+    }
+    const box = $('m-cloud');
+    if (!box || box.classList.contains('hide')) return;
+    $('cl-setup').classList.toggle('hide', ligado);
+    $('cl-live').classList.toggle('hide', !ligado);
+    if (ligado) {
+      $('cl-who').textContent = this.cloud.email || '—';
+      $('cl-when').textContent = this.syncing ? 'sincronizando…'
+        : this.cloudMsg ? 'erro: ' + this.cloudMsg
+          : this.cloud.last ? 'última sincronização ' + quando(this.cloud.last)
+            : 'ainda não sincronizou';
+    }
+  },
+
+  // aceita o bloco de configuração copiado do console do Firebase, ou os dois campos soltos
+  async connect(novo) {
+    const bruto = $('cl-cfg').value;
+    if (bruto.trim()) {
+      const k = bruto.match(/apiKey["'\s:]+([A-Za-z0-9_\-]+)/);
+      const d = bruto.match(/(https:\/\/[A-Za-z0-9._\-]+\.firebase(?:io|database)[A-Za-z0-9.\-]*\.(?:com|app)[^"'\s,}]*)/);
+      if (!k || !d) { this.toast('Não achei apiKey e databaseURL nesse texto.'); return; }
+      this.cloud.apiKey = k[1];
+      this.cloud.db = String(d[1]).replace(/\/+$/, '');
+    }
+    if (!this.cloud.apiKey || !this.cloud.db) { this.toast('Cole a configuração do seu projeto Firebase.'); return; }
+
+    const mail = $('cl-mail').value.trim(), pass = $('cl-pass').value;
+    if (!mail || !pass) { this.toast('Informe e-mail e senha.'); return; }
+
+    this.cloudMsg = '';
+    try {
+      await this.signIn(mail, pass, novo);
+    } catch (err) {
+      this.toast(String(err.message || err));
+      return;
+    }
+    this.sigs.clear();
+    this.stamp();
+    this.paintCloud();
+    await this.sync(true);
+    this.paintCloud();
+  }
+,
 
   /* ---------- avisos ---------- */
   toast(m) {
